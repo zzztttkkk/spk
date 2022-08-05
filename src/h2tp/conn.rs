@@ -1,5 +1,5 @@
-use std::io::Write;
-use std::net::TcpStream;
+use tokio::io::AsyncWriteExt;
+use tokio::net::TcpStream;
 
 pub struct Conn {
 	stream: TcpStream,
@@ -10,10 +10,8 @@ impl Conn {
 		return Self { stream };
 	}
 
-	pub fn handle(&mut self) {
-		println!("{:?} {}", std::thread::current().id(), self.stream.peer_addr().unwrap());
-		let mut sref = &self.stream;
-		sref.write(b"HTTP/1.0 200 OK\r\nContent-Length: 12\r\n\r\nHello World!").err();
-		sref.flush().err();
+	pub async fn handle(&mut self) {
+		println!("{}", self.stream.peer_addr().unwrap());
+		self.stream.write(b"HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nHello World").await.err();
 	}
 }

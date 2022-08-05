@@ -1,6 +1,7 @@
 mod h2tp;
 
-fn main() {
-	let mut serv = h2tp::create_server(3);
-	serv.listen("127.0.0.1:8080");
+#[tokio::main]
+async fn main() {
+	let mut server = h2tp::create_server();
+	server.listen("127.0.0.1:8080").await;
 }
