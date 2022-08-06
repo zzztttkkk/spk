@@ -19,12 +19,13 @@ impl Server {
 		};
 	}
 
-	pub fn graceful_shutdown(&mut self, shutdown_signal_receiver: UnboundedReceiver<()>, func: Option<fn()>) -> UnboundedReceiver<()> {
-		self.shutdown_signal_receiver = Some(shutdown_signal_receiver);
+	pub fn graceful_shutdown(&mut self, func: Option<fn()>) -> (UnboundedSender<()>, UnboundedReceiver<()>) {
+		let (signal_sender, signal_receiver) = tokio::sync::mpsc::unbounded_channel();
+		self.shutdown_signal_receiver = Some(signal_receiver);
 		self.before_shutdown = func;
-		let (s, r) = tokio::sync::mpsc::unbounded_channel();
-		self.shutdown_done_sender = Some(s);
-		return r;
+		let (done_sender, done_receiver) = tokio::sync::mpsc::unbounded_channel();
+		self.shutdown_done_sender = Some(done_sender);
+		return (signal_sender, done_receiver);
 	}
 
 	pub async fn listen<Addr: tokio::net::ToSocketAddrs>(&mut self, addr: Addr) {
