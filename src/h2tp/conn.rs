@@ -1,9 +1,10 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool};
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::time::sleep;
+use crate::h2tp::ordering::ATOMIC_ORDERING;
 
 pub struct Conn {
 	stream: TcpStream,
@@ -24,7 +25,7 @@ impl Conn {
 
 		match &self.server_is_closing {
 			Some(closing) => {
-				if closing.load(Ordering::SeqCst) {
+				if closing.load(ATOMIC_ORDERING) {
 					return;
 				}
 			}

@@ -1,16 +1,18 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::time::Duration;
 use tokio::net::{TcpListener};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::sleep;
 use crate::h2tp::conn::Conn;
+use crate::h2tp::ordering::ATOMIC_ORDERING;
 
 pub struct Server {
 	listener: Option<TcpListener>,
 	shutdown_signal_receiver: Option<UnboundedReceiver<()>>,
 	before_shutdown: Option<fn()>,
-	shutdown_done_sender: Option<UnboundedSender<()>>,
+	shutdown_done_sender: Option<UnboundedSender<bool>>,
+	shutdown_timeout: u64,
 }
 
 impl Server {
@@ -20,10 +22,12 @@ impl Server {
 			shutdown_signal_receiver: None,
 			before_shutdown: None,
 			shutdown_done_sender: None,
+			shutdown_timeout: 0,
 		};
 	}
 
-	pub fn graceful_shutdown(&mut self, func: Option<fn()>) -> (UnboundedSender<()>, UnboundedReceiver<()>) {
+	pub fn graceful_shutdown(&mut self, timeout: u64, func: Option<fn()>) -> (UnboundedSender<()>, UnboundedReceiver<bool>) {
+		self.shutdown_timeout = timeout;
 		let (signal_sender, signal_receiver) = tokio::sync::mpsc::unbounded_channel();
 		self.shutdown_signal_receiver = Some(signal_receiver);
 		self.before_shutdown = func;
@@ -52,7 +56,6 @@ impl Server {
 			let rref = self.shutdown_signal_receiver.as_mut().unwrap();
 			let alive_conn_count = Arc::new(AtomicU64::new(0));
 			let closing = Arc::new(AtomicBool::new(false));
-			let ordering = Ordering::Relaxed;
 
 			loop {
 				tokio::select! {
@@ -62,10 +65,10 @@ impl Server {
 								let alive_conn_count_clone = Arc::clone(&alive_conn_count);
 								let closing_clone = Arc::clone(&closing);
 								tokio::spawn(async move {
-									alive_conn_count_clone.fetch_add(1, ordering);
+									alive_conn_count_clone.fetch_add(1, ATOMIC_ORDERING);
 									let mut conn = Conn::new(stream, Some(closing_clone));
 									conn.handle().await;
-									alive_conn_count_clone.fetch_sub(1, ordering);
+									alive_conn_count_clone.fetch_sub(1, ATOMIC_ORDERING);
 								});
 							},
 							Err(_)=>{}
@@ -78,23 +81,35 @@ impl Server {
 							},
 							None=>{}
 						}
-						Arc::clone(&closing).store(true, ordering);
+						Arc::clone(&closing).store(true, ATOMIC_ORDERING);
 						println!("Closing...");
 						break;
 					}
 				}
 			}
 
+			let mut timeout = self.shutdown_timeout;
+			if timeout < 3000 {
+				timeout = 3000;
+			}
+			let (m, r) = (timeout / 100, timeout % 100);
+			if r != 0 {
+				timeout = (m + 1) * 100;
+			}
+
 			loop {
-				let count = alive_conn_count.load(ordering);
-				if count != 0 {
-					sleep(Duration::from_secs(1)).await;
+				if alive_conn_count.load(ATOMIC_ORDERING) != 0 {
+					sleep(Duration::from_millis(100)).await;
+					timeout -= 100;
+					if timeout == 0 {
+						break;
+					}
 					continue;
 				}
 				break;
 			}
 
-			self.shutdown_done_sender.as_ref().unwrap().send(()).err();
+			self.shutdown_done_sender.as_ref().unwrap().send(alive_conn_count.load(ATOMIC_ORDERING) == 0).err();
 		}
 	}
 }
