@@ -13,6 +13,7 @@ async fn main() {
 		Ok(()) => {
 			shutdown_signal_sender.send(()).unwrap();
 			shutdown_done_receiver.recv().await;
+			println!("Graceful Shutdown.");
 		}
 		Err(err) => {
 			eprintln!("Unable to listen for shutdown signal: {}", err);

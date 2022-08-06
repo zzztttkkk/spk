@@ -1,5 +1,9 @@
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::Duration;
 use tokio::net::{TcpListener};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::time::sleep;
 use crate::h2tp::conn::Conn;
 
 pub struct Server {
@@ -37,7 +41,7 @@ impl Server {
 				match lref.accept().await {
 					Ok((stream, _)) => {
 						tokio::spawn(async move {
-							let mut conn = Conn::new(stream);
+							let mut conn = Conn::new(stream, None);
 							conn.handle().await;
 						});
 					}
@@ -46,15 +50,22 @@ impl Server {
 			}
 		} else {
 			let rref = self.shutdown_signal_receiver.as_mut().unwrap();
+			let alive_conn_count = Arc::new(AtomicU64::new(0));
+			let closing = Arc::new(AtomicBool::new(false));
+			let ordering = Ordering::Relaxed;
 
 			loop {
 				tokio::select! {
 					result = lref.accept() => {
 						match result {
 							Ok((stream, _))=>{
+								let alive_conn_count_clone = Arc::clone(&alive_conn_count);
+								let closing_clone = Arc::clone(&closing);
 								tokio::spawn(async move {
-									let mut conn = Conn::new(stream);
+									alive_conn_count_clone.fetch_add(1, ordering);
+									let mut conn = Conn::new(stream, Some(closing_clone));
 									conn.handle().await;
+									alive_conn_count_clone.fetch_sub(1, ordering);
 								});
 							},
 							Err(_)=>{}
@@ -67,11 +78,23 @@ impl Server {
 							},
 							None=>{}
 						}
+						Arc::clone(&closing).store(true, ordering);
+						println!("Closing...");
 						break;
 					}
 				}
 			}
+
+			loop {
+				let count = alive_conn_count.load(ordering);
+				if count != 0 {
+					sleep(Duration::from_secs(1)).await;
+					continue;
+				}
+				break;
+			}
+
+			self.shutdown_done_sender.as_ref().unwrap().send(()).err();
 		}
-		println!("Graceful Shutdown");
 	}
 }
