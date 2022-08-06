@@ -40,6 +40,8 @@ impl Server {
 		self.listener = Some(TcpListener::bind(addr).await.unwrap());
 		let lref = self.listener.as_ref().unwrap();
 
+		println!("Listening...");
+
 		if self.shutdown_signal_receiver.is_none() {
 			loop {
 				match lref.accept().await {
@@ -81,7 +83,7 @@ impl Server {
 							},
 							None=>{}
 						}
-						Arc::clone(&closing).store(true, ATOMIC_ORDERING);
+						closing.store(true, ATOMIC_ORDERING);
 						println!("Closing...");
 						break;
 					}
