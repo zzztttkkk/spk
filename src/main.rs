@@ -1,12 +1,31 @@
 mod h2tp;
 
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+	#[clap(short, long, default_value = "127.0.0.1:8080")]
+	addr: String,
+
+	#[clap(short, long, default_value_t = 3000)]
+	graceful_shutdown: u64,
+}
+
 #[tokio::main]
 async fn main() {
+	let mut args: Args = Args::parse();
+	if args.graceful_shutdown < 1000 {
+		args.graceful_shutdown = 1000;
+	}
+	println!("{:?}", args);
+
 	let mut server = h2tp::create_server();
-	let (shutdown_signal_sender, mut shutdown_done_receiver) = server.graceful_shutdown(5000, None);
+
+	let (shutdown_signal_sender, mut shutdown_done_receiver) = server.graceful_shutdown(args.graceful_shutdown, None);
 
 	tokio::spawn(async move {
-		server.listen("127.0.0.1:8080").await;
+		server.listen(args.addr).await;
 	});
 
 	match tokio::signal::ctrl_c().await {
