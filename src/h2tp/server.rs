@@ -5,7 +5,7 @@ use tokio::net::{TcpListener};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::sleep;
 use crate::h2tp::conn::Conn;
-use crate::h2tp::ordering::ATOMIC_ORDERING;
+use crate::h2tp::cfg::ATOMIC_ORDERING;
 
 pub struct Server {
 	listener: Option<TcpListener>,

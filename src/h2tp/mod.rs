@@ -1,7 +1,7 @@
 mod server;
 mod conn;
-mod ordering;
-mod packet;
+mod cfg;
+mod message;
 mod utils;
 
 pub fn create_server() -> server::Server {

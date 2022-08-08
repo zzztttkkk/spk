@@ -4,7 +4,7 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::time::sleep;
-use crate::h2tp::ordering::ATOMIC_ORDERING;
+use crate::h2tp::cfg::ATOMIC_ORDERING;
 
 pub struct Conn {
 	stream: TcpStream,
