@@ -14,6 +14,7 @@ struct Message {
 	bufremains: usize,
 }
 
+#[derive(PartialEq)]
 enum ParseStatus {
 	Empty,
 	Startline1,
@@ -108,10 +109,10 @@ impl Message {
 
 			for c in bufslice {
 				self.bufremains -= 1;
-
+				let c = *c;
 
 				if skip_newline {
-					if c != '\n' {
+					if c != b'\n' {
 						return Some(ParseError::ue(BAD_REQUEST));
 					}
 
