@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 struct AryMap {
 	keys: Vec<String>,
-	values: Vec<Vec<String>>,
+	values: Vec<Box<Vec<String>>>,
 }
 
 impl AryMap {
@@ -22,7 +22,7 @@ impl AryMap {
 	pub fn get(&self, key: &str) -> Option<&Vec<String>> {
 		return match self.find_idx(key) {
 			Some(idx) => {
-				Some(&(self.values[idx]))
+				Some(&(*(self.values[idx])))
 			}
 			None => {
 				None
@@ -33,7 +33,7 @@ impl AryMap {
 	fn getmut(&mut self, key: &str) -> Option<&mut Vec<String>> {
 		return match self.find_idx(key) {
 			Some(idx) => {
-				Some(&mut (self.values[idx]))
+				Some(&mut (*(self.values[idx])))
 			}
 			None => {
 				None
@@ -48,7 +48,7 @@ impl AryMap {
 			}
 			None => {
 				self.keys.push(key.to_string());
-				self.values.push(vec![val.to_string()]);
+				self.values.push(Box::new(vec![val.to_string()]));
 			}
 		}
 	}
@@ -61,7 +61,7 @@ impl AryMap {
 			}
 			None => {
 				self.keys.push(key.to_string());
-				self.values.push(vec![val.to_string()]);
+				self.values.push(Box::new(vec![val.to_string()]));
 			}
 		}
 	}
@@ -94,7 +94,7 @@ impl AryMap {
 
 pub struct MultiMap {
 	ary: Option<AryMap>,
-	map: Option<HashMap<String, Vec<String>>>,
+	map: Option<HashMap<String, Box<Vec<String>>>>,
 }
 
 impl MultiMap {
@@ -108,7 +108,14 @@ impl MultiMap {
 	pub fn get(&self, key: &str) -> Option<&Vec<String>> {
 		return match self.map.as_ref() {
 			Some(mapref) => {
-				mapref.get(key)
+				match mapref.get(key) {
+					Some(v) => {
+						return Some(&(*v));
+					}
+					None => {
+						None
+					}
+				}
 			}
 			None => {
 				match self.ary.as_ref() {
@@ -141,6 +148,7 @@ impl MultiMap {
 		return self.get(key).is_some();
 	}
 
+	#[inline]
 	pub fn count(&self, key: &str) -> usize {
 		return match self.get(key) {
 			Some(v) => {
@@ -193,7 +201,7 @@ impl MultiMap {
 						v.push(val.to_string());
 					}
 					None => {
-						mapref.insert(key.to_string(), vec![val.to_string()]);
+						mapref.insert(key.to_string(), Box::new(vec![val.to_string()]));
 					}
 				}
 			}
@@ -208,13 +216,10 @@ impl MultiMap {
 					let mapref = self.map.as_mut().unwrap();
 					for i in 0..aryref.keys.len() {
 						let k = &aryref.keys[i];
-						let vs = &aryref.values[i];
-						// todo more effective copy
-						let mut vsc = Vec::new();
-						for v in vs {
-							vsc.push(v.as_str().to_string());
+						unsafe {
+							let np = aryref.values[i].clone();
+							mapref.insert(k.to_string(), Box::from_raw(Box::into_raw(np)));
 						}
-						mapref.insert(k.to_string(), vsc);
 					}
 					self.ary = None;
 					return;
@@ -234,7 +239,7 @@ impl MultiMap {
 						v.push(val.to_string());
 					}
 					None => {
-						mapref.insert(key.to_string(), vec![val.to_string()]);
+						mapref.insert(key.to_string(), Box::new(vec![val.to_string()]));
 					}
 				}
 			}
@@ -247,29 +252,76 @@ impl MultiMap {
 			}
 		}
 	}
+
+	pub fn each(&self, func: fn(key: &str, val: &str)) {
+		match self.map.as_ref() {
+			Some(mapref) => {
+				for (k, vs) in mapref.iter() {
+					for v in vs.iter() {
+						func(k, v);
+					}
+				}
+			}
+			None => {
+				match self.ary.as_ref() {
+					Some(aryref) => {
+						for i in 0..aryref.keys.len() {
+							let k = &aryref.keys[i];
+							let vs = &aryref.values[i];
+							for v in vs.iter() {
+								func(k, v);
+							}
+						}
+					}
+					None => {}
+				}
+			}
+		}
+	}
 }
 
 
 #[cfg(test)]
 mod tests {
-	use crate::h2tp::utils::multi_map::AryMap;
+	use crate::h2tp::utils::multi_map::MultiMap;
+
+	#[derive(Debug)]
+	struct X {
+		num: i32,
+	}
+
+	impl X {
+		pub fn new(n: i32) -> Self {
+			return Self { num: n };
+		}
+	}
+
+	impl Drop for X {
+		fn drop(&mut self) {
+			println!("Drop {} @ {}", self.num, self as *const X as u64);
+		}
+	}
+
+	#[test]
+	fn test_box() {
+		unsafe {
+			let x = Box::new(vec![X::new(1), X::new(2), X::new(3)]);
+			let mut y = Box::from_raw(Box::into_raw(x));
+			y.push(X::new(4));
+			println!("{:?}", y);
+		}
+	}
 
 	#[test]
 	fn test_multi_map() {
-		let mut m = AryMap::new();
-		m.append("a", "12");
-		m.append("a", "45");
-		m.set("a", "456");
+		let mut mm = MultiMap::new();
+		mm.append("a", "12");
+		mm.append("b", "23");
+		mm.append("a", "56");
+		mm.set("c", "66");
 
-		match m.get("a") {
-			Some(v) => {
-				println!("{}", v.join(","));
-			}
-			None => {}
-		}
-
-		m.each(|key, val| {
-			println!("K: {} V: {}", key, val)
+		mm.each(|k, v| {
+			println!("K {}; V {}", k, v);
 		});
 	}
 }
