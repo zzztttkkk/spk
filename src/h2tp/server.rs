@@ -78,8 +78,8 @@ impl Server {
 					},
 					_ = rref.recv() => {
 						match self.before_shutdown {
-							Some(f)=>{
-								f();
+							Some(before_shutdown)=>{
+								before_shutdown();
 							},
 							None=>{}
 						}
@@ -94,14 +94,15 @@ impl Server {
 			if timeout < 3000 {
 				timeout = 3000;
 			}
-			let (m, r) = (timeout / 100, timeout % 100);
+			let (q, r) = (timeout / 100, timeout % 100);
 			if r != 0 {
-				timeout = (m + 1) * 100;
+				timeout = (q + 1) * 100;
 			}
 
+			let duration = Duration::from_millis(100);
 			loop {
 				if alive_conn_count.load(ATOMIC_ORDERING) != 0 {
-					sleep(Duration::from_millis(100)).await;
+					sleep(duration).await;
 					timeout -= 100;
 					if timeout == 0 {
 						break;
