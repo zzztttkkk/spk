@@ -78,7 +78,22 @@ impl Message {
 		};
 	}
 
+	fn clear(&mut self) {
+		self.startline.0.clear();
+		self.startline.1.clear();
+		self.startline.2.clear();
+		match self.headers.as_mut() {
+			Some(href) => {
+				href.clear();
+			}
+			None => {}
+		}
+		self.bufremains = 0;
+	}
+
 	async fn from(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
+		self.clear();
+
 		if self.buf.is_none() {
 			self.buf = Some(BytesMut::with_capacity(MESSAGE_BUFFER_SIZE));
 		}
@@ -193,7 +208,7 @@ impl Message {
 }
 
 
-struct Request {
+pub struct Request {
 	msg: Message,
 }
 
@@ -202,5 +217,10 @@ impl Request {
 		return Self {
 			msg: Message::new(),
 		};
+	}
+
+
+	pub async fn from(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
+		return self.msg.from(stream);
 	}
 }
