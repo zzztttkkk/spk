@@ -283,33 +283,20 @@ impl MultiMap {
 
 #[cfg(test)]
 mod tests {
+	// use std::borrow::Borrow;
+	use std::cell::{Ref, RefCell};
+	use std::ops::Deref;
+	use std::rc::Rc;
 	use crate::h2tp::utils::multi_map::MultiMap;
 
-	#[derive(Debug)]
-	struct X {
-		num: i32,
-	}
-
-	impl X {
-		pub fn new(n: i32) -> Self {
-			return Self { num: n };
-		}
-	}
-
-	impl Drop for X {
-		fn drop(&mut self) {
-			println!("Drop {} @ {}", self.num, self as *const X as u64);
-		}
+	fn get_value(a: &Rc<RefCell<i32>>) -> Ref<i32> {
+		return a.borrow();
 	}
 
 	#[test]
-	fn test_box() {
-		unsafe {
-			let x = Box::new(vec![X::new(1), X::new(2), X::new(3)]);
-			let mut y = Box::from_raw(Box::into_raw(x));
-			y.push(X::new(4));
-			println!("{:?}", y);
-		}
+	fn test_ref() {
+		let num = Rc::new(RefCell::new(12));
+		println!("{}", get_value(&num));
 	}
 
 	#[test]
