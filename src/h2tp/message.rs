@@ -207,9 +207,6 @@ impl Message {
 	}
 }
 
-unsafe impl Send for Message {}
-
-
 pub struct Request {
 	msg: Message,
 }
