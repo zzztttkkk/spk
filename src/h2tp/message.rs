@@ -6,7 +6,7 @@ use tokio::net::TcpStream;
 use crate::h2tp::cfg::MESSAGE_BUFFER_SIZE;
 use crate::h2tp::utils::multi_map::MultiMap;
 
-struct Message {
+pub struct Message {
 	startline: (String, String, String),
 	headers: Option<MultiMap>,
 	body: Option<BytesMut>,
@@ -207,6 +207,8 @@ impl Message {
 	}
 }
 
+unsafe impl Send for Message {}
+
 
 pub struct Request {
 	msg: Message,
@@ -221,6 +223,9 @@ impl Request {
 
 
 	pub async fn from(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
-		return self.msg.from(stream);
+		let msg = &mut self.msg;
+		return msg.from(stream).await;
 	}
 }
+
+unsafe impl Send for Request {}
