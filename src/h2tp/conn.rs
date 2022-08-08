@@ -23,21 +23,24 @@ impl Conn {
 		loop {
 			match req.from(&mut self.stream).await {
 				Some(e) => {
+					if !e.is_empty() {
+						println!("{:?}", e);
+					}
 					break;
 				}
 				None => {
 					self.stream.write(b"HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nHello World").await.err();
-
-					match &self.server_is_closing {
-						Some(closing) => {
-							if closing.load(ATOMIC_ORDERING) {
-								return;
-							}
-						}
-						None => {}
-					}
 				}
 			}
+			match &self.server_is_closing {
+				Some(closing) => {
+					if closing.load(ATOMIC_ORDERING) {
+						return;
+					}
+				}
+				None => {}
+			}
 		}
+		self.stream.flush().await.err();
 	}
 }

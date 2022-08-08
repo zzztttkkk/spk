@@ -1,12 +1,14 @@
 use std::fmt;
 use std::fmt::{Formatter, write};
+use std::sync::{Mutex, MutexGuard};
 use bytes::BytesMut;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::net::TcpStream;
 use crate::h2tp::cfg::MESSAGE_BUFFER_SIZE;
 use crate::h2tp::utils::multi_map::MultiMap;
 
 pub struct Message {
+	lock: Mutex<()>,
 	startline: (String, String, String),
 	headers: Option<MultiMap>,
 	body: Option<BytesMut>,
@@ -30,18 +32,29 @@ pub struct ParseError {
 }
 
 impl ParseError {
-	pub fn ioe(v: std::io::Error) -> Self {
+	fn ioe(v: std::io::Error) -> Self {
 		return Self {
 			ioe: Some(v),
 			ue: None,
 		};
 	}
 
-	pub fn ue(v: &'static str) -> Self {
+	fn ue(v: &'static str) -> Self {
 		return Self {
 			ioe: None,
 			ue: Some(v),
 		};
+	}
+
+	fn empty() -> Self {
+		return Self {
+			ioe: None,
+			ue: None,
+		};
+	}
+
+	pub fn is_empty(&self) -> bool {
+		return self.ioe.is_none() && self.ue.is_none();
 	}
 }
 
@@ -70,6 +83,7 @@ const BAD_REQUEST: &'static str = "bad request";
 impl Message {
 	fn new() -> Self {
 		return Self {
+			lock: Mutex::new(()),
 			startline: (String::new(), String::new(), String::new()),
 			headers: None,
 			body: None,
@@ -92,10 +106,16 @@ impl Message {
 	}
 
 	async fn from(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
+		let _ = self.lock.lock().unwrap();
+
 		self.clear();
 
 		if self.buf.is_none() {
-			self.buf = Some(BytesMut::with_capacity(MESSAGE_BUFFER_SIZE));
+			let mut buf = BytesMut::with_capacity(MESSAGE_BUFFER_SIZE);
+			unsafe {
+				buf.set_len(MESSAGE_BUFFER_SIZE);
+			}
+			self.buf = Some(buf);
 		}
 
 		let bufref = self.buf.as_mut().unwrap().as_mut();
@@ -114,12 +134,16 @@ impl Message {
 				match size {
 					Ok(size) => {
 						self.bufremains = size;
-						bufslice = bufref;
+						bufslice = &bufref[0..size];
 					}
 					Err(e) => {
 						return Some(ParseError::ioe(e));
 					}
 				}
+			}
+
+			if bufslice.len() == 0 {
+				return Some(ParseError::empty());
 			}
 
 			for c in bufslice {
@@ -172,6 +196,7 @@ impl Message {
 								);
 								hkey.clear();
 								hval.clear();
+								hkvsep = false;
 							} else {
 								if !hkey.is_empty() || !hval.is_empty() {
 									return Some(ParseError::ue(BAD_REQUEST));
@@ -182,7 +207,6 @@ impl Message {
 						} else {
 							if hkvsep {
 								hval.push(c as char);
-								hkvsep = false;
 							} else {
 								if c == b':' {
 									hkvsep = true;
@@ -203,9 +227,19 @@ impl Message {
 			}
 		}
 
+		// match &self.headers {
+		// 	Some(headers) => {
+		// 		headers.each(|k, v| {
+		// 			println!("{}: {}", k, v);
+		// 		});
+		// 	}
+		// 	None => {}
+		// }
 		return None;
 	}
 }
+
+unsafe impl Send for Message {}
 
 pub struct Request {
 	msg: Message,

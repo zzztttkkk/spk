@@ -207,13 +207,12 @@ impl MultiMap {
 		};
 	}
 
-	fn getone(&self, k: &str) -> Option<&String> {
+	pub fn getone(&self, k: &str) -> Option<&String> {
 		return match self.get(k) {
 			Some(vals) => {
 				let first = vals.first();
 				match first {
 					Some(e) => {
-
 						unsafe {
 							Some(&*(e as *const String))
 						}
@@ -227,6 +226,32 @@ impl MultiMap {
 				None
 			}
 		};
+	}
+
+	pub fn each(&self, func: fn(k: &str, v: &str)) {
+		match self.map.as_ref() {
+			Some(mapref) => {
+				for (k, valsref) in mapref.iter() {
+					for v in valsref.borrow().iter() {
+						func(k, v);
+					}
+				}
+			}
+			None => {
+				match self.ary.as_ref() {
+					Some(aryref) => {
+						for i in 0..aryref.keys.len() {
+							let k = &aryref.keys[i];
+							let valsref = aryref.vals[i].borrow();
+							for v in valsref.iter() {
+								func(k, v);
+							}
+						}
+					}
+					None => {}
+				}
+			}
+		}
 	}
 }
 
