@@ -198,7 +198,7 @@ impl Message {
 								let headersref = self.headers.as_mut().unwrap();
 								headersref.append(
 									&hkey.trim().to_ascii_lowercase(),
-									&hval.trim(),
+									hval.trim(),
 								);
 								hkey.clear();
 								hval.clear();
