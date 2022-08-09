@@ -73,9 +73,7 @@ impl AryMap {
 			Some(idx) => {
 				let mut guard = self.vals[idx].lock().await;
 				let vals = (*guard).borrow();
-				unsafe {
-					return Some(&(*(vals.as_ref() as *const Vec<String>)));
-				}
+				return Some(&(*(vals.as_ref() as *const Vec<String>)));
 			}
 			None => {
 				None
@@ -200,9 +198,7 @@ impl MultiMap {
 					Some(valsref) => {
 						let guard = valsref.lock().await;
 						let valsref = (*guard).borrow();
-						unsafe {
-							Some(&(*(valsref.as_ref() as *const Vec<String>)))
-						}
+						Some(&(*(valsref.as_ref() as *const Vec<String>)))
 					}
 					None => {
 						None
