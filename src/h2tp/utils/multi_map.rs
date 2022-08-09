@@ -182,7 +182,7 @@ impl MultiMap {
 		}
 	}
 
-	pub fn get<'a>(&'a self, k: &str) -> Option<&'a Vec<String>> {
+	pub fn get(&self, k: &str) -> Option<&Vec<String>> {
 		return match self.map.as_ref() {
 			Some(mapref) => {
 				let valsref = mapref.get(k);
@@ -208,30 +208,12 @@ impl MultiMap {
 		};
 	}
 
-	pub fn get_one<'a>(&'a self, k: &str) -> Option<&'a String> {
+	pub fn getone(&self, k: &str) -> Option<&String> {
 		return match self.get(k) {
 			Some(vals) => {
 				match vals.first() {
 					Some(ele) => {
 						Some(ele)
-					}
-					None => {
-						None
-					}
-				}
-			}
-			None => {
-				None
-			}
-		};
-	}
-
-	pub unsafe fn getone(&self, k: &str) -> Option<&String> {
-		return match self.get(k) {
-			Some(vals) => {
-				match vals.first() {
-					Some(ele) => {
-						Some(&(*(ele as *const String)))
 					}
 					None => {
 						None
