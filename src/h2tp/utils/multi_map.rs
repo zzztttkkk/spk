@@ -68,7 +68,7 @@ impl AryMap {
 		}
 	}
 
-	async fn get(&self, k: &str) -> Option<&Vec<String>> {
+	async unsafe fn get(&self, k: &str) -> Option<&Vec<String>> {
 		return match self.idx(k) {
 			Some(idx) => {
 				let mut guard = self.vals[idx].lock().await;
@@ -192,7 +192,7 @@ impl MultiMap {
 		}
 	}
 
-	pub async fn get(&self, k: &str) -> Option<&Vec<String>> {
+	pub async unsafe fn get(&self, k: &str) -> Option<&Vec<String>> {
 		return match self.map.as_ref() {
 			Some(mapref) => {
 				let valsref = mapref.get(k);
@@ -222,7 +222,7 @@ impl MultiMap {
 		};
 	}
 
-	pub async fn getone(&self, k: &str) -> Option<&String> {
+	pub async unsafe fn getone(&self, k: &str) -> Option<&String> {
 		return match self.get(k).await {
 			Some(vals) => {
 				vals.first()

@@ -24,7 +24,10 @@ impl Headers {
 	}
 
 	pub async fn content_length(&self) -> Option<usize> {
-		let val = self.m.getone(CONTENT_LENGTH).await;
+		let mut val: Option<&String> = None;
+		unsafe {
+			val = self.m.getone(CONTENT_LENGTH).await;
+		}
 		match val {
 			Some(v) => {
 				return match v.parse::<i32>() {
@@ -46,11 +49,15 @@ impl Headers {
 	}
 
 	pub async fn content_type(&self) -> Option<&String> {
-		return self.m.getone(CONTENT_TYPE).await;
+		unsafe {
+			return self.m.getone(CONTENT_TYPE).await;
+		}
 	}
 
 	pub async fn transfer_encoding(&self) -> Option<&String> {
-		return self.m.getone(TRANSFER_ENCODING).await;
+		unsafe {
+			return self.m.getone(TRANSFER_ENCODING).await;
+		}
 	}
 
 	pub async fn is_chunked(&self) -> bool {
