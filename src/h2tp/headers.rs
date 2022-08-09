@@ -1,3 +1,5 @@
+use std::fmt;
+use std::fmt::{Formatter};
 use crate::h2tp::utils::multi_map::MultiMap;
 
 pub struct Headers {
@@ -62,5 +64,15 @@ impl Headers {
 				false
 			}
 		};
+	}
+}
+
+impl fmt::Debug for Headers {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "Headers<\r\n")?;
+		self.m.each(|k, v| {
+			println!("\t{}: {}", k, v);
+		});
+		write!(f, ">")
 	}
 }

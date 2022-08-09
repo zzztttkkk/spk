@@ -137,51 +137,31 @@ impl Message {
 			return None;
 		}
 
-		if self.body.is_none() {
-			let buf = BytesMut::with_capacity(cl);
-			self.body = Some(buf);
-		}
-		let bodyref = self.body.as_mut().unwrap();
-		let bufref = self.buf.as_mut().unwrap().as_mut();
-
 		let mut remain = cl;
-		if self.bufremains > 0 {
-			let begin = self.bufsize - self.bufremains;
+		loop {
+			match self.read(stream).await {
+				Some(e) => {
+					return Some(e);
+				}
+				None => {}
+			}
 
-			if self.bufremains >= remain {
-				bodyref.extend_from_slice(&bufref[begin..(begin + remain)]);
+			let bodyref = self.body.as_mut().unwrap();
+			let bufref = self.buf.as_mut().unwrap().as_mut();
+			let bytesslice: &[u8] = &bufref[self.bufsize - self.bufremains..self.bufsize];
+
+			if remain >= bytesslice.len() {
+				self.bufremains = 0;
+				remain -= bytesslice.len();
+				bodyref.extend_from_slice(bytesslice);
+			} else {
 				self.bufremains -= remain;
 				remain = 0;
-			} else {
-				bodyref.extend_from_slice(&bufref[begin..self.bufsize]);
-				self.bufremains = 0;
-				remain -= self.bufremains;
+				bodyref.extend_from_slice(&bytesslice[0..remain]);
 			}
-		}
 
-		let bufref = self.buf.as_mut().unwrap().as_mut();
-
-		loop {
 			if remain == 0 {
 				break;
-			}
-
-			let mut rl: usize = remain;
-			if remain > MESSAGE_BUFFER_SIZE {
-				rl = MESSAGE_BUFFER_SIZE;
-			}
-
-			match stream.read(&mut bufref[0..rl]).await {
-				Ok(size) => {
-					if size == 0 {
-						return Some(ParseError::empty());
-					}
-					bodyref.extend_from_slice(&bufref[0..size]);
-					remain -= size;
-				}
-				Err(e) => {
-					return Some(ParseError::ioe(e));
-				}
 			}
 		}
 		return None;
@@ -208,11 +188,6 @@ impl Message {
 	}
 
 	async fn read_chunked_body(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
-		if self.body.is_none() {
-			let buf = BytesMut::with_capacity(4096);
-			self.body = Some(buf);
-		}
-
 		let mut current_chunk_size: Option<usize> = None;
 		let mut numbuf = String::new();
 		let mut skip_newline = false;
@@ -306,6 +281,10 @@ impl Message {
 
 		match cl {
 			Some(cl) => {
+				if self.body.is_none() {
+					let buf = BytesMut::with_capacity(cl);
+					self.body = Some(buf);
+				}
 				match self.read_sized_body(stream, cl).await {
 					Some(e) => {
 						return Some(e);
@@ -322,6 +301,10 @@ impl Message {
 					None => {}
 				}
 				if is_chunked {
+					if self.body.is_none() {
+						let buf = BytesMut::with_capacity(4096);
+						self.body = Some(buf);
+					}
 					match self.read_chunked_body(stream).await {
 						Some(e) => {
 							return Some(e);
@@ -484,5 +467,13 @@ impl Request {
 
 	pub fn version(&self) -> &str {
 		return self.msg.startline.2.as_str();
+	}
+
+	pub fn headers(&self) -> Option<&Headers> {
+		return self.msg.headers.as_ref();
+	}
+
+	pub fn body(&self) -> Option<&BytesMut> {
+		return self.msg.body.as_ref();
 	}
 }
