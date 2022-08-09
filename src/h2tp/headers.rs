@@ -15,16 +15,16 @@ impl Headers {
 		};
 	}
 
-	pub fn append(&mut self, k: &str, v: &str) {
-		self.m.append(k, v);
+	pub async fn append(&mut self, k: &str, v: &str) {
+		self.m.append(k, v).await;
 	}
 
 	pub fn clear(&mut self) {
 		self.m.clear();
 	}
 
-	pub fn content_length(&self) -> Option<usize> {
-		let val = self.m.getone(CONTENT_LENGTH);
+	pub async fn content_length(&self) -> Option<usize> {
+		let val = self.m.getone(CONTENT_LENGTH).await;
 		match val {
 			Some(v) => {
 				return match v.parse::<i32>() {
@@ -45,26 +45,16 @@ impl Headers {
 		}
 	}
 
-	pub fn set_content_length(&mut self, size: usize) -> &mut Self {
-		self.m.reset(CONTENT_LENGTH, size.to_string().as_str());
-		return self;
+	pub async fn content_type(&self) -> Option<&String> {
+		return self.m.getone(CONTENT_TYPE).await;
 	}
 
-	pub fn content_type(&self) -> Option<&String> {
-		return self.m.getone(CONTENT_TYPE);
+	pub async fn transfer_encoding(&self) -> Option<&String> {
+		return self.m.getone(TRANSFER_ENCODING).await;
 	}
 
-	pub fn set_content_type(&mut self, content_type: &str) -> &mut Self {
-		self.m.reset(CONTENT_TYPE, content_type);
-		return self;
-	}
-
-	pub fn transfer_encoding(&self) -> Option<&String> {
-		return self.m.getone(TRANSFER_ENCODING);
-	}
-
-	pub fn is_chunked(&self) -> bool {
-		return match self.transfer_encoding() {
+	pub async fn is_chunked(&self) -> bool {
+		return match self.transfer_encoding().await {
 			Some(v) => {
 				v.contains("chunked")
 			}

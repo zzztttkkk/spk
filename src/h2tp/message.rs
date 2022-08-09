@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::{Formatter, write};
+use std::sync::Arc;
 use bytes::BytesMut;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::net::TcpStream;
@@ -195,7 +196,7 @@ impl Message {
 								headersref.append(
 									&hkey.trim().to_ascii_lowercase(),
 									&hval.trim(),
-								);
+								).await;
 								hkey.clear();
 								hval.clear();
 								hkvsep = false;
@@ -232,7 +233,7 @@ impl Message {
 		let mut cl: Option<usize> = None;
 		match &self.headers {
 			Some(href) => {
-				cl = href.content_length();
+				cl = href.content_length().await;
 			}
 			None => {}
 		}
@@ -287,7 +288,7 @@ impl Message {
 				let mut is_chunked = false;
 				match &self.headers {
 					Some(href) => {
-						is_chunked = href.is_chunked();
+						is_chunked = href.is_chunked().await;
 					}
 					None => {}
 				}
@@ -301,7 +302,7 @@ impl Message {
 }
 
 pub struct Request {
-	msg: RwLock<Message>,
+	msg: Message,
 }
 
 impl fmt::Debug for Request {
@@ -313,28 +314,19 @@ impl fmt::Debug for Request {
 impl Request {
 	pub fn new() -> Self {
 		return Self {
-			msg: RwLock::new(Message::new()),
+			msg: Message::new(),
 		};
 	}
 
-	pub async fn clear(&mut self) {
-		let mut guard = self.msg.write().await;
-		(*guard).clear();
+	pub fn clear(&mut self) {
+		self.msg.clear();
 	}
 
 	pub async fn from(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
-		let mut guard = self.msg.write().await;
-		return (*guard).from(stream).await;
+		return self.msg.from(stream).await;
 	}
 
-	pub async fn method(&self) -> &str {
-		let guard = self.msg.read().await;
-		unsafe {
-			return &(*((*guard).startline.0.as_str() as *const str));
-		}
+	pub fn method(&self) -> &str {
+		return self.msg.startline.0.as_str();
 	}
 }
-
-unsafe impl Send for Message {}
-
-unsafe impl Sync for Message {}
