@@ -95,7 +95,7 @@ impl MultiMap {
 				let vals = mapref.get_mut(k);
 				match vals {
 					Some(valsref) => {
-						let mut valsref = valsref;
+						let valsref = valsref;
 						valsref.push(v.to_string());
 					}
 					None => {
@@ -104,24 +104,44 @@ impl MultiMap {
 				}
 			}
 			None => {
-				if self.ary.is_none() {
+				// 拿 ary 的不可變引用，進行判斷。
+				if let Some(ref ary) = self.ary {
+					// 判斷 keys 有沒有 >= 12，如果有則進行置換。
+					if ary.keys.len() >= 12 {
+						self.swap_ary_to_hashmap();
+					} else {
+						// 拿 ary 的可變引用，並 append。
+						self.ary.as_mut().unwrap().append(k, v);
+					}
+				} else {
 					self.ary = Some(AryMap::new());
 				}
-
-				let aryref = self.ary.as_mut().unwrap();
-				if aryref.keys.len() >= 12 {
-					self.map = Some(HashMap::new());
-					let mapref = self.map.as_mut().unwrap();
-
-					for idx in 0..aryref.keys.len() {
-						let _k = &aryref.keys[idx];
-						let _vals = aryref.vals[idx].clone();
-						mapref.insert(_k.to_string(), _vals);
-					}
-				}
-				aryref.append(k, v);
 			}
 		}
+	}
+
+	/// 將目前 ary 的內容 swap 到 [`HashMap`]。
+	fn swap_ary_to_hashmap(&mut self) -> Option<()> {
+		// 取走 ary 的所有權。
+		let mut ary = self.ary.take()?;
+
+		// 建立一個 HashMap，並預先分配與 ary.keys 同等長度的空間。
+		let mut map = HashMap::with_capacity(ary.keys.len());
+
+		// 然後把 ary 全部置換到 HashMap。
+		while !ary.keys.is_empty() {
+			// HashMap 是無序的，所以我們只要無序 pop，
+			// 直到 ary.keys 一點也不剩即可。
+			let key = ary.keys.pop().expect("should be Some");
+			let val = ary.vals.pop().expect("val is bound to key");
+
+			map.insert(key, val);
+		}
+
+		// 把建立的 HashMap 放到 self.map。
+		self.map = Some(map);
+
+		Some(())
 	}
 
 	pub fn clear(&mut self) {
