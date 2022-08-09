@@ -111,6 +111,229 @@ impl Message {
 		}
 	}
 
+	async fn read(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
+		let bufref = self.buf.as_mut().unwrap().as_mut();
+		if self.bufremains > 0 {
+			return None;
+		} else {
+			match stream.read(&mut bufref[0..MESSAGE_BUFFER_SIZE]).await {
+				Ok(size) => {
+					if size == 0 {
+						return Some(ParseError::empty());
+					}
+					self.bufremains = size;
+					self.bufsize = size;
+				}
+				Err(e) => {
+					return Some(ParseError::ioe(e));
+				}
+			}
+		}
+		return None;
+	}
+
+	async fn read_sized_body(&mut self, stream: &mut TcpStream, cl: usize) -> Option<ParseError> {
+		if cl == 0 {
+			return None;
+		}
+
+		if self.body.is_none() {
+			let buf = BytesMut::with_capacity(cl);
+			self.body = Some(buf);
+		}
+		let bodyref = self.body.as_mut().unwrap();
+		let bufref = self.buf.as_mut().unwrap().as_mut();
+
+		let mut remain = cl;
+		if self.bufremains > 0 {
+			let begin = self.bufsize - self.bufremains;
+
+			if self.bufremains >= remain {
+				bodyref.extend_from_slice(&bufref[begin..(begin + remain)]);
+				self.bufremains -= remain;
+				remain = 0;
+			} else {
+				bodyref.extend_from_slice(&bufref[begin..self.bufsize]);
+				self.bufremains = 0;
+				remain -= self.bufremains;
+			}
+		}
+
+		let bufref = self.buf.as_mut().unwrap().as_mut();
+
+		loop {
+			if remain == 0 {
+				break;
+			}
+
+			let mut rl: usize = remain;
+			if remain > MESSAGE_BUFFER_SIZE {
+				rl = MESSAGE_BUFFER_SIZE;
+			}
+
+			match stream.read(&mut bufref[0..rl]).await {
+				Ok(size) => {
+					if size == 0 {
+						return Some(ParseError::empty());
+					}
+					bodyref.extend_from_slice(&bufref[0..size]);
+					remain -= size;
+				}
+				Err(e) => {
+					return Some(ParseError::ioe(e));
+				}
+			}
+		}
+		return None;
+	}
+
+	async fn read_byte(&mut self, stream: &mut TcpStream) -> Result<u8, ParseError> {
+		let bufref = self.buf.as_mut().unwrap().as_mut();
+
+		let c: u8;
+		if self.bufremains > 0 {
+			self.bufremains -= 1;
+			c = bufref[self.bufsize - self.bufremains];
+		} else {
+			match stream.read_u8().await {
+				Ok(v) => {
+					c = v;
+				}
+				Err(e) => {
+					return Err(ParseError::ioe(e));
+				}
+			}
+		}
+		return Ok(c);
+	}
+
+	async fn read_chunked_body(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
+		if self.body.is_none() {
+			let buf = BytesMut::with_capacity(4096);
+			self.body = Some(buf);
+		}
+
+		let mut current_chunk_size: Option<usize> = None;
+		let mut numbuf = String::new();
+		let mut skip_newline = false;
+
+		loop {
+			match current_chunk_size {
+				None => {
+					match self.read(stream).await {
+						Some(e) => {
+							return Some(e);
+						}
+						None => {}
+					}
+
+					let bufref = self.buf.as_mut().unwrap().as_mut();
+					let bytesslice: &[u8] = &bufref[self.bufsize - self.bufremains..self.bufsize];
+					for c in bytesslice {
+						self.bufremains -= 1;
+						let c = *c;
+
+						if skip_newline {
+							if c != b'\n' {
+								return Some(ParseError::ue(BAD_REQUEST));
+							}
+							skip_newline = false;
+							break;
+						}
+
+						if c == b'\r' {
+							match numbuf.parse::<i32>() {
+								Ok(v) => {
+									if v < 0 {
+										return Some(ParseError::ue(BAD_REQUEST));
+									}
+									current_chunk_size = Some(v as usize);
+								}
+								Err(_) => {
+									return Some(ParseError::ue(BAD_REQUEST));
+								}
+							}
+							continue;
+						}
+						numbuf.push(c as char);
+					}
+				}
+				Some(remain) => {
+					match self.read_sized_body(stream, remain).await {
+						Some(e) => {
+							return Some(e);
+						}
+						None => {
+							match self.read_byte(stream).await {
+								Ok(c) => {
+									if c != b'\r' {
+										return Some(ParseError::ue(BAD_REQUEST));
+									}
+								}
+								Err(e) => {
+									return Some(e);
+								}
+							}
+							match self.read_byte(stream).await {
+								Ok(c) => {
+									if c != b'\n' {
+										return Some(ParseError::ue(BAD_REQUEST));
+									}
+								}
+								Err(e) => {
+									return Some(e);
+								}
+							}
+							if remain == 0 {
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+		return None;
+	}
+
+	async fn read_body(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
+		let mut cl: Option<usize> = None;
+		match &self.headers {
+			Some(href) => {
+				cl = href.content_length();
+			}
+			None => {}
+		}
+
+		match cl {
+			Some(cl) => {
+				match self.read_sized_body(stream, cl).await {
+					Some(e) => {
+						return Some(e);
+					}
+					None => {}
+				}
+			}
+			None => {
+				let mut is_chunked = false;
+				match &self.headers {
+					Some(href) => {
+						is_chunked = href.is_chunked();
+					}
+					None => {}
+				}
+				if is_chunked {
+					match self.read_chunked_body(stream).await {
+						Some(e) => {
+							return Some(e);
+						}
+						None => {}
+					}
+				}
+			}
+		}
+		return None;
+	}
+
 	async fn from(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
 		if self.buf.is_none() {
 			let mut buf = BytesMut::with_capacity(MESSAGE_BUFFER_SIZE);
@@ -120,7 +343,6 @@ impl Message {
 			self.buf = Some(buf);
 		}
 
-		let bufref = self.buf.as_mut().unwrap().as_mut();
 		let mut status: ParseStatus = ParseStatus::Empty;
 		let mut skip_newline = false;
 		let mut hkey = String::new();
@@ -128,28 +350,17 @@ impl Message {
 		let mut hkvsep = false;
 
 		loop {
-			let bufslice: &[u8];
-			if self.bufremains > 0 {
-				bufslice = &bufref[0..self.bufremains];
-			} else {
-				let size = stream.read(bufref).await;
-				match size {
-					Ok(size) => {
-						self.bufsize = size;
-						self.bufremains = size;
-						bufslice = &bufref[0..size];
-					}
-					Err(e) => {
-						return Some(ParseError::ioe(e));
-					}
+			match self.read(stream).await {
+				Some(e) => {
+					return Some(e);
 				}
+				None => {}
 			}
 
-			if bufslice.len() == 0 {
-				return Some(ParseError::empty());
-			}
+			let bufref = self.buf.as_mut().unwrap().as_mut();
+			let bytesslice: &[u8] = &bufref[self.bufsize - self.bufremains..self.bufsize];
 
-			for c in bufslice {
+			for c in bytesslice {
 				self.bufremains -= 1;
 				let c = *c;
 
@@ -227,79 +438,11 @@ impl Message {
 					}
 				}
 			}
-
 			if status == ParseStatus::HeadersOK {
 				break;
 			}
 		}
-
-		let mut cl: Option<usize> = None;
-		match &self.headers {
-			Some(href) => {
-				cl = href.content_length();
-			}
-			None => {}
-		}
-
-		match cl {
-			Some(cl) => {
-				if self.body.is_none() {
-					let buf = BytesMut::with_capacity(cl);
-					self.body = Some(buf);
-				}
-				let bodyref = self.body.as_mut().unwrap();
-
-				let mut remain = cl;
-				if self.bufremains > 0 {
-					let begin = self.bufsize - self.bufremains;
-
-					if self.bufremains >= remain {
-						bodyref.extend_from_slice(&bufref[begin..(begin + remain)]);
-						self.bufremains -= remain;
-						remain = 0;
-					} else {
-						bodyref.extend_from_slice(&bufref[begin..(begin + self.bufremains)]);
-						self.bufremains = 0;
-						remain -= self.bufremains;
-					}
-				}
-
-				loop {
-					if remain == 0 {
-						break;
-					}
-
-					let mut rl: usize = remain;
-					if remain > MESSAGE_BUFFER_SIZE {
-						rl = MESSAGE_BUFFER_SIZE;
-					}
-
-					match stream.read(&mut bufref[0..rl]).await {
-						Ok(size) => {
-							if size == 0 {
-								return Some(ParseError::empty());
-							}
-							bodyref.extend_from_slice(&bufref[0..size]);
-							remain -= size;
-						}
-						Err(_) => {}
-					}
-				}
-			}
-			None => {
-				let mut is_chunked = false;
-				match &self.headers {
-					Some(href) => {
-						is_chunked = href.is_chunked();
-					}
-					None => {}
-				}
-				if is_chunked {
-					todo!("chunked body");
-				}
-			}
-		}
-		return None;
+		return self.read_body(stream).await;
 	}
 }
 
@@ -309,10 +452,9 @@ pub struct Request {
 
 impl fmt::Debug for Request {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "Request <{} {} {} @ {:#X}/{:?}>",
+		write!(f, "Request <{} {} {} @ {:#x}>",
 			   self.method(), self.path(), self.version(),
 			   (self as *const Request as u64),
-			   std::thread::current().id(),
 		)
 	}
 }

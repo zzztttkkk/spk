@@ -44,6 +44,7 @@ impl Headers {
 		}
 	}
 
+	#[allow(dead_code)]
 	pub fn content_type(&self) -> Option<&String> {
 		return self.m.getone(CONTENT_TYPE);
 	}

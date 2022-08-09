@@ -9,20 +9,20 @@ struct Args {
 	addr: String,
 
 	#[clap(short, long, default_value_t = 3000)]
-	graceful_shutdown: u64,
+	shutdown_timeout: u64,
 }
 
 #[tokio::main]
 async fn main() {
 	let mut args: Args = Args::parse();
-	if args.graceful_shutdown < 1000 {
-		args.graceful_shutdown = 1000;
+	if args.shutdown_timeout < 1000 {
+		args.shutdown_timeout = 1000;
 	}
 	println!("{:?}", args);
 
 	let mut server = h2tp::create_server();
 
-	let (shutdown_signal_sender, mut shutdown_done_receiver) = server.graceful_shutdown(args.graceful_shutdown, None);
+	let (shutdown_signal_sender, mut shutdown_done_receiver) = server.graceful_shutdown(args.shutdown_timeout, None);
 
 	tokio::spawn(async move {
 		server.listen(args.addr).await;
