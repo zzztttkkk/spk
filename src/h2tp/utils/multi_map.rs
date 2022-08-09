@@ -1,11 +1,11 @@
-use std::cell::{Ref, RefCell};
+// use std::cell::{Ref};
 use std::collections::HashMap;
 
 // Arc<Mutex<RefCell<Vec<String>>>>
-type Values = RefCell<Vec<String>>;
+type Values = Vec<String>;
 
 fn values(v: &str) -> Values {
-	return Values::new(vec![v.to_string()]);
+	return Values::from(vec![v.to_string()]);
 }
 
 struct AryMap {
@@ -28,7 +28,7 @@ impl AryMap {
 	fn append(&mut self, k: &str, v: &str) {
 		match self.idx(k) {
 			Some(idx) => {
-				let mut vals = self.vals[idx].borrow_mut();
+				let vals = &mut self.vals[idx];
 				vals.push(v.to_string());
 			}
 			None => {
@@ -56,7 +56,7 @@ impl AryMap {
 	fn reset(&mut self, k: &str, v: &str) {
 		match self.idx(k) {
 			Some(idx) => {
-				let mut vals = self.vals[idx].borrow_mut();
+				let vals = &mut self.vals[idx];
 				vals.clear();
 				vals.push(v.to_string());
 			}
@@ -64,10 +64,10 @@ impl AryMap {
 		}
 	}
 
-	fn get(&self, k: &str) -> Option<Ref<Vec<String>>> {
+	fn get<'a>(&'a self, k: &str) -> Option<&'a Vec<String>> {
 		return match self.idx(k) {
 			Some(idx) => {
-				return Some(self.vals[idx].borrow());
+				return Some(&self.vals[idx]);
 			}
 			None => {
 				None
@@ -95,7 +95,7 @@ impl MultiMap {
 				let vals = mapref.get_mut(k);
 				match vals {
 					Some(valsref) => {
-						let mut valsref = valsref.borrow_mut();
+						let mut valsref = valsref;
 						valsref.push(v.to_string());
 					}
 					None => {
@@ -162,7 +162,7 @@ impl MultiMap {
 				let vals = mapref.get_mut(k);
 				match vals {
 					Some(valsref) => {
-						let mut vals = valsref.borrow_mut();
+						let mut vals = valsref;
 						vals.clear();
 						vals.push(v.to_string());
 					}
@@ -182,13 +182,13 @@ impl MultiMap {
 		}
 	}
 
-	pub fn get(&self, k: &str) -> Option<Ref<Vec<String>>> {
+	pub fn get<'a>(&'a self, k: &str) -> Option<&'a Vec<String>> {
 		return match self.map.as_ref() {
 			Some(mapref) => {
 				let valsref = mapref.get(k);
 				match valsref {
 					Some(valsref) => {
-						Some(valsref.borrow())
+						Some(valsref)
 					}
 					None => {
 						None
@@ -204,6 +204,24 @@ impl MultiMap {
 						None
 					}
 				}
+			}
+		};
+	}
+
+	pub fn get_one<'a>(&'a self, k: &str) -> Option<&'a String> {
+		return match self.get(k) {
+			Some(vals) => {
+				match vals.first() {
+					Some(ele) => {
+						Some(ele)
+					}
+					None => {
+						None
+					}
+				}
+			}
+			None => {
+				None
 			}
 		};
 	}
@@ -230,7 +248,7 @@ impl MultiMap {
 		match self.map.as_ref() {
 			Some(mapref) => {
 				for (k, valsref) in mapref.iter() {
-					for v in valsref.borrow().iter() {
+					for v in valsref.iter() {
 						func(k, v);
 					}
 				}
@@ -240,7 +258,7 @@ impl MultiMap {
 					Some(aryref) => {
 						for i in 0..aryref.keys.len() {
 							let k = &aryref.keys[i];
-							let valsref = aryref.vals[i].borrow();
+							let valsref = &aryref.vals[i];
 							for v in valsref.iter() {
 								func(k, v);
 							}
@@ -255,7 +273,7 @@ impl MultiMap {
 
 #[cfg(test)]
 mod tests {
-	use crate::h2tp::utils::multi_map::{AryMap, MultiMap};
+	use crate::h2tp::utils::multi_map::{MultiMap};
 
 	#[test]
 	fn test_mm() {
