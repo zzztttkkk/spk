@@ -286,4 +286,13 @@ mod tests {
 		mm.append("a", "2");
 		mm.append("a", "4");
 	}
+
+	#[test]
+	fn test_swap() {
+		let mut mm = MultiMap::new();
+
+		for i in 0..40 {
+			mm.append(&format!("k{}", i), &format!("v{}", i));
+		}
+	}
 }
