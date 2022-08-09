@@ -161,8 +161,7 @@ impl MultiMap {
 			Some(mapref) => {
 				let vals = mapref.get_mut(k);
 				match vals {
-					Some(valsref) => {
-						let mut vals = valsref;
+					Some(vals) => {
 						vals.clear();
 						vals.push(v.to_string());
 					}
@@ -291,7 +290,7 @@ mod tests {
 	fn test_option_take() {
 		let mut opt = Some(vec![Obj::new(1), Obj::new(2), Obj::new(3)]);
 		println!("{:?}", opt);
-		let mut vs = opt.take().unwrap();
+		let vs = opt.take().unwrap();
 		println!("{:?}", vs);
 	}
 }
