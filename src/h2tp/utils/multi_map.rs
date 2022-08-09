@@ -1,7 +1,5 @@
-// use std::cell::{Ref};
 use std::collections::HashMap;
 
-// Arc<Mutex<RefCell<Vec<String>>>>
 type Values = Vec<String>;
 
 fn values(v: &str) -> Values {
@@ -64,15 +62,15 @@ impl AryMap {
 		}
 	}
 
-	fn get<'a>(&'a self, k: &str) -> Option<&'a Vec<String>> {
-		return match self.idx(k) {
+	fn get(&self, k: &str) -> Option<&Vec<String>> {
+		match self.idx(k) {
 			Some(idx) => {
-				return Some(&self.vals[idx]);
+				Some(&self.vals[idx])
 			}
 			None => {
 				None
 			}
-		};
+		}
 	}
 }
 
@@ -95,7 +93,6 @@ impl MultiMap {
 				let vals = mapref.get_mut(k);
 				match vals {
 					Some(valsref) => {
-						let valsref = valsref;
 						valsref.push(v.to_string());
 					}
 					None => {
@@ -104,44 +101,27 @@ impl MultiMap {
 				}
 			}
 			None => {
-				// 拿 ary 的不可變引用，進行判斷。
-				if let Some(ref ary) = self.ary {
-					// 判斷 keys 有沒有 >= 12，如果有則進行置換。
-					if ary.keys.len() >= 12 {
-						self.swap_ary_to_hashmap();
-					} else {
-						// 拿 ary 的可變引用，並 append。
-						self.ary.as_mut().unwrap().append(k, v);
-					}
-				} else {
+				if self.ary.is_none() {
 					self.ary = Some(AryMap::new());
+				}
+
+				let aryref = self.ary.as_mut().unwrap();
+				if aryref.keys.len() >= 12 {
+					self.swap_ary_to_hashmap()
+				} else {
+					aryref.append(k, v);
 				}
 			}
 		}
 	}
 
-	/// 將目前 ary 的內容 swap 到 [`HashMap`]。
-	fn swap_ary_to_hashmap(&mut self) -> Option<()> {
-		// 取走 ary 的所有權。
-		let mut ary = self.ary.take()?;
-
-		// 建立一個 HashMap，並預先分配與 ary.keys 同等長度的空間。
+	fn swap_ary_to_hashmap(&mut self) {
+		let mut ary = self.ary.take().unwrap();
 		let mut map = HashMap::with_capacity(ary.keys.len());
-
-		// 然後把 ary 全部置換到 HashMap。
 		while !ary.keys.is_empty() {
-			// HashMap 是無序的，所以我們只要無序 pop，
-			// 直到 ary.keys 一點也不剩即可。
-			let key = ary.keys.pop().expect("should be Some");
-			let val = ary.vals.pop().expect("val is bound to key");
-
-			map.insert(key, val);
+			map.insert(ary.keys.pop().unwrap(), ary.vals.pop().unwrap());
 		}
-
-		// 把建立的 HashMap 放到 self.map。
 		self.map = Some(map);
-
-		Some(())
 	}
 
 	pub fn clear(&mut self) {
@@ -205,15 +185,7 @@ impl MultiMap {
 	pub fn get(&self, k: &str) -> Option<&Vec<String>> {
 		return match self.map.as_ref() {
 			Some(mapref) => {
-				let valsref = mapref.get(k);
-				match valsref {
-					Some(valsref) => {
-						Some(valsref)
-					}
-					None => {
-						None
-					}
-				}
+				mapref.get(k)
 			}
 			None => {
 				match self.ary.as_ref() {
@@ -231,14 +203,7 @@ impl MultiMap {
 	pub fn getone(&self, k: &str) -> Option<&String> {
 		return match self.get(k) {
 			Some(vals) => {
-				match vals.first() {
-					Some(ele) => {
-						Some(ele)
-					}
-					None => {
-						None
-					}
-				}
+				vals.first()
 			}
 			None => {
 				None
@@ -275,6 +240,8 @@ impl MultiMap {
 
 #[cfg(test)]
 mod tests {
+	use core::fmt;
+	use std::fmt::Formatter;
 	use crate::h2tp::utils::multi_map::{MultiMap};
 
 	#[test]
@@ -294,5 +261,37 @@ mod tests {
 		for i in 0..40 {
 			mm.append(&format!("k{}", i), &format!("v{}", i));
 		}
+	}
+
+	struct Obj {
+		num: i32,
+	}
+
+	impl Obj {
+		fn new(m: i32) -> Self {
+			return Self {
+				num: m,
+			};
+		}
+	}
+
+	impl fmt::Debug for Obj {
+		fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+			write!(f, "{} @ {}", self.num, (self as *const Obj as u64))
+		}
+	}
+
+	impl Drop for Obj {
+		fn drop(&mut self) {
+			println!("Dropped {} @ {}", self.num, (self as *const Obj as u64));
+		}
+	}
+
+	#[test]
+	fn test_option_take() {
+		let mut opt = Some(vec![Obj::new(1), Obj::new(2), Obj::new(3)]);
+		println!("{:?}", opt);
+		let mut vs = opt.take().unwrap();
+		println!("{:?}", vs);
 	}
 }

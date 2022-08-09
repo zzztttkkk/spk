@@ -24,11 +24,7 @@ impl Headers {
 	}
 
 	pub fn content_length(&self) -> Option<usize> {
-		let val: Option<&String>;
-		unsafe {
-			val = self.m.getone(CONTENT_LENGTH);
-		}
-		match val {
+		match self.m.getone(CONTENT_LENGTH) {
 			Some(v) => {
 				return match v.parse::<i32>() {
 					Ok(num) => {
@@ -49,15 +45,11 @@ impl Headers {
 	}
 
 	pub fn content_type(&self) -> Option<&String> {
-		unsafe {
-			return self.m.getone(CONTENT_TYPE);
-		}
+		return self.m.getone(CONTENT_TYPE);
 	}
 
 	pub fn transfer_encoding(&self) -> Option<&String> {
-		unsafe {
-			return self.m.getone(TRANSFER_ENCODING);
-		}
+		return self.m.getone(TRANSFER_ENCODING);
 	}
 
 	pub fn is_chunked(&self) -> bool {

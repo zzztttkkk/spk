@@ -309,7 +309,11 @@ pub struct Request {
 
 impl fmt::Debug for Request {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "Request <{} {} {}>", self.method(), self.path(), self.version())
+		write!(f, "Request <{} {} {} @ {:#X}/{:?}>",
+			   self.method(), self.path(), self.version(),
+			   (self as *const Request as u64),
+			   std::thread::current().id(),
+		)
 	}
 }
 
