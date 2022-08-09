@@ -242,7 +242,6 @@ impl Message {
 			Some(cl) => {
 				if self.body.is_none() {
 					let mut buf = BytesMut::with_capacity(cl);
-					unsafe { buf.set_len(cl); }
 					self.body = Some(buf);
 				}
 				let bodyref = self.body.as_mut().unwrap();
@@ -252,11 +251,11 @@ impl Message {
 					let begin = self.bufsize - self.bufremains;
 
 					if self.bufremains >= remain {
-						bodyref.copy_from_slice(&bufref[begin..(begin + remain)]);
+						bodyref.extend_from_slice(&bufref[begin..(begin + remain)]);
 						self.bufremains -= remain;
 						remain = 0;
 					} else {
-						bodyref.copy_from_slice(&bufref[begin..(begin + self.bufremains)]);
+						bodyref.extend_from_slice(&bufref[begin..(begin + self.bufremains)]);
 						self.bufremains = 0;
 						remain -= self.bufremains;
 					}
@@ -277,7 +276,7 @@ impl Message {
 							if size == 0 {
 								return Some(ParseError::empty());
 							}
-							bodyref.copy_from_slice(&bufref[0..size]);
+							bodyref.extend_from_slice(&bufref[0..size]);
 							remain -= size;
 						}
 						Err(_) => {}
@@ -307,7 +306,7 @@ pub struct Request {
 
 impl fmt::Debug for Request {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		todo!()
+		write!(f, "Request <{} {} {}>", self.method(), self.path(), self.version())
 	}
 }
 
@@ -328,5 +327,13 @@ impl Request {
 
 	pub fn method(&self) -> &str {
 		return self.msg.startline.0.as_str();
+	}
+
+	pub fn path(&self) -> &str {
+		return self.msg.startline.1.as_str();
+	}
+
+	pub fn version(&self) -> &str {
+		return self.msg.startline.2.as_str();
 	}
 }

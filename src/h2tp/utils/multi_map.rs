@@ -126,7 +126,7 @@ impl MultiMap {
 						mapref.insert(_k.to_string(), _vals);
 					}
 				}
-				aryref.append(k, v);
+				aryref.append(k, v).await;
 			}
 		}
 	}
