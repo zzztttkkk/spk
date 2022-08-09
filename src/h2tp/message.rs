@@ -329,6 +329,12 @@ impl Request {
 
 	pub async fn method(&self) -> &str {
 		let guard = self.msg.read().await;
-		return (*guard).startline.0.as_str();
+		unsafe {
+			return &(*((*guard).startline.0.as_str() as *const str));
+		}
 	}
 }
+
+unsafe impl Send for Message {}
+
+unsafe impl Sync for Message {}
