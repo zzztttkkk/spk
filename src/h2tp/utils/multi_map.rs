@@ -1,12 +1,12 @@
-use std::cell::{RefCell, RefMut};
+use std::borrow::Borrow;
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
-type Values = Arc<Mutex<RefCell<Vec<String>>>>;
+// Arc<Mutex<RefCell<Vec<String>>>>
+type Values = RefCell<Vec<String>>;
 
 fn values(v: &str) -> Values {
-	return Values::new(Mutex::new(RefCell::new(vec![v.to_string()])));
+	return Values::new(vec![v.to_string()]);
 }
 
 struct AryMap {
@@ -26,11 +26,10 @@ impl AryMap {
 		return self.keys.iter().position(|e| { return e == k; });
 	}
 
-	async fn append(&mut self, k: &str, v: &str) {
+	fn append(&mut self, k: &str, v: &str) {
 		match self.idx(k) {
 			Some(idx) => {
-				let guard = self.vals[idx].lock().await;
-				let mut vals = (*guard).borrow_mut();
+				let mut vals = self.vals[idx].borrow_mut();
 				vals.push(v.to_string());
 			}
 			None => {
@@ -55,12 +54,10 @@ impl AryMap {
 		}
 	}
 
-	async fn reset(&mut self, k: &str, v: &str) {
+	fn reset(&mut self, k: &str, v: &str) {
 		match self.idx(k) {
 			Some(idx) => {
-				let guard = self.vals[idx].lock().await;
-				let mut vals = (*guard).borrow_mut();
-
+				let mut vals = self.vals[idx].borrow_mut();
 				vals.clear();
 				vals.push(v.to_string());
 			}
@@ -68,12 +65,10 @@ impl AryMap {
 		}
 	}
 
-	async unsafe fn get(&self, k: &str) -> Option<&Vec<String>> {
+	fn get(&self, k: &str) -> Option<Ref<Vec<String>>> {
 		return match self.idx(k) {
 			Some(idx) => {
-				let guard = self.vals[idx].lock().await;
-				let vals = (*guard).borrow();
-				return Some(&(*(vals.as_ref() as *const Vec<String>)));
+				return Some(self.vals[idx].borrow());
 			}
 			None => {
 				None
@@ -95,14 +90,13 @@ impl MultiMap {
 		};
 	}
 
-	pub async fn append(&mut self, k: &str, v: &str) {
+	pub fn append(&mut self, k: &str, v: &str) {
 		match self.map.as_mut() {
 			Some(mapref) => {
 				let vals = mapref.get_mut(k);
 				match vals {
 					Some(valsref) => {
-						let guard = valsref.lock().await;
-						let mut valsref = (*guard).borrow_mut();
+						let mut valsref = valsref.borrow_mut();
 						valsref.push(v.to_string());
 					}
 					None => {
@@ -126,7 +120,7 @@ impl MultiMap {
 						mapref.insert(_k.to_string(), _vals);
 					}
 				}
-				aryref.append(k, v).await;
+				aryref.append(k, v);
 			}
 		}
 	}
@@ -163,14 +157,13 @@ impl MultiMap {
 		}
 	}
 
-	pub async fn reset(&mut self, k: &str, v: &str) {
+	pub fn reset(&mut self, k: &str, v: &str) {
 		match self.map.as_mut() {
 			Some(mapref) => {
 				let vals = mapref.get_mut(k);
 				match vals {
 					Some(valsref) => {
-						let guard = valsref.lock().await;
-						let mut vals: RefMut<Vec<String>> = (*guard).borrow_mut();
+						let mut vals = valsref.borrow_mut();
 						vals.clear();
 						vals.push(v.to_string());
 					}
@@ -182,7 +175,7 @@ impl MultiMap {
 			None => {
 				match self.ary.as_mut() {
 					Some(aryref) => {
-						aryref.reset(k, v).await;
+						aryref.reset(k, v);
 					}
 					None => {}
 				}
@@ -190,15 +183,13 @@ impl MultiMap {
 		}
 	}
 
-	pub async unsafe fn get(&self, k: &str) -> Option<&Vec<String>> {
+	pub fn get(&self, k: &str) -> Option<Ref<Vec<String>>> {
 		return match self.map.as_ref() {
 			Some(mapref) => {
 				let valsref = mapref.get(k);
 				match valsref {
 					Some(valsref) => {
-						let guard = valsref.lock().await;
-						let valsref = (*guard).borrow();
-						Some(&(*(valsref.as_ref() as *const Vec<String>)))
+						Some(valsref.borrow())
 					}
 					None => {
 						None
@@ -208,7 +199,7 @@ impl MultiMap {
 			None => {
 				match self.ary.as_ref() {
 					Some(aryref) => {
-						aryref.get(k).await
+						aryref.get(k)
 					}
 					None => {
 						None
@@ -218,10 +209,17 @@ impl MultiMap {
 		};
 	}
 
-	pub async unsafe fn getone(&self, k: &str) -> Option<&String> {
-		return match self.get(k).await {
+	pub unsafe fn getone(&self, k: &str) -> Option<&String> {
+		return match self.get(k) {
 			Some(vals) => {
-				vals.first()
+				match vals.first() {
+					Some(ele) => {
+						Some(&(*(ele as *const String)))
+					}
+					None => {
+						None
+					}
+				}
 			}
 			None => {
 				None
@@ -229,12 +227,11 @@ impl MultiMap {
 		};
 	}
 
-	pub async fn each(&self, func: fn(k: &str, v: &str)) {
+	pub fn each(&self, func: fn(k: &str, v: &str)) {
 		match self.map.as_ref() {
 			Some(mapref) => {
 				for (k, valsref) in mapref.iter() {
-					let guard = valsref.lock().await;
-					for v in (*guard).borrow().iter() {
+					for v in valsref.borrow().iter() {
 						func(k, v);
 					}
 				}
@@ -244,8 +241,7 @@ impl MultiMap {
 					Some(aryref) => {
 						for i in 0..aryref.keys.len() {
 							let k = &aryref.keys[i];
-							let guard = aryref.vals[i].lock().await;
-							let valsref = (*guard).borrow();
+							let valsref = aryref.vals[i].borrow();
 							for v in valsref.iter() {
 								func(k, v);
 							}
@@ -264,15 +260,11 @@ mod tests {
 
 	#[test]
 	fn test_mm() {
-		tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap().block_on(
-			async {
-				let mut mm = MultiMap::new();
-				mm.append("a", "1").await;
-				mm.clear();
-				mm.remove("a");
-				mm.append("a", "2").await;
-				mm.append("a", "4").await;
-			}
-		);
+		let mut mm = MultiMap::new();
+		mm.append("a", "1");
+		mm.clear();
+		mm.remove("a");
+		mm.append("a", "2");
+		mm.append("a", "4");
 	}
 }

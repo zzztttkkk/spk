@@ -199,7 +199,7 @@ impl Message {
 								headersref.append(
 									&hkey.trim().to_ascii_lowercase(),
 									&hval.trim(),
-								).await;
+								);
 								hkey.clear();
 								hval.clear();
 								hkvsep = false;
@@ -236,7 +236,7 @@ impl Message {
 		let mut cl: Option<usize> = None;
 		match &self.headers {
 			Some(href) => {
-				cl = href.content_length().await;
+				cl = href.content_length();
 			}
 			None => {}
 		}
@@ -290,7 +290,7 @@ impl Message {
 				let mut is_chunked = false;
 				match &self.headers {
 					Some(href) => {
-						is_chunked = href.is_chunked().await;
+						is_chunked = href.is_chunked();
 					}
 					None => {}
 				}
@@ -304,7 +304,7 @@ impl Message {
 }
 
 pub struct Request {
-	msg: Message,
+	msg: Message, // Arc<Mutex<Message>>
 }
 
 impl fmt::Debug for Request {

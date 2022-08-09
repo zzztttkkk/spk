@@ -15,18 +15,18 @@ impl Headers {
 		};
 	}
 
-	pub async fn append(&mut self, k: &str, v: &str) {
-		self.m.append(k, v).await;
+	pub fn append(&mut self, k: &str, v: &str) {
+		self.m.append(k, v);
 	}
 
 	pub fn clear(&mut self) {
 		self.m.clear();
 	}
 
-	pub async fn content_length(&self) -> Option<usize> {
+	pub fn content_length(&self) -> Option<usize> {
 		let val: Option<&String>;
 		unsafe {
-			val = self.m.getone(CONTENT_LENGTH).await;
+			val = self.m.getone(CONTENT_LENGTH);
 		}
 		match val {
 			Some(v) => {
@@ -48,20 +48,20 @@ impl Headers {
 		}
 	}
 
-	pub async fn content_type(&self) -> Option<&String> {
+	pub fn content_type(&self) -> Option<&String> {
 		unsafe {
-			return self.m.getone(CONTENT_TYPE).await;
+			return self.m.getone(CONTENT_TYPE);
 		}
 	}
 
-	pub async fn transfer_encoding(&self) -> Option<&String> {
+	pub fn transfer_encoding(&self) -> Option<&String> {
 		unsafe {
-			return self.m.getone(TRANSFER_ENCODING).await;
+			return self.m.getone(TRANSFER_ENCODING);
 		}
 	}
 
-	pub async fn is_chunked(&self) -> bool {
-		return match self.transfer_encoding().await {
+	pub fn is_chunked(&self) -> bool {
+		return match self.transfer_encoding() {
 			Some(v) => {
 				v.contains("chunked")
 			}
