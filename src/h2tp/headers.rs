@@ -24,7 +24,7 @@ impl Headers {
 	}
 
 	pub async fn content_length(&self) -> Option<usize> {
-		let mut val: Option<&String> = None;
+		let val: Option<&String>;
 		unsafe {
 			val = self.m.getone(CONTENT_LENGTH).await;
 		}

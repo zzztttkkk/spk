@@ -1,13 +1,10 @@
 use std::fmt;
-use std::fmt::{Formatter, write};
-use std::sync::Arc;
+use std::fmt::{Formatter};
 use bytes::BytesMut;
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::io::{AsyncReadExt};
 use tokio::net::TcpStream;
-use tokio::sync::{Mutex, RwLock};
 use crate::h2tp::cfg::MESSAGE_BUFFER_SIZE;
 use crate::h2tp::headers::Headers;
-use crate::h2tp::utils::multi_map::MultiMap;
 
 pub struct Message {
 	startline: (String, String, String),
@@ -26,7 +23,6 @@ enum ParseStatus {
 	Startline2,
 	Startline3,
 	HeadersOK,
-	Done,
 }
 
 pub struct ParseError {
@@ -106,6 +102,13 @@ impl Message {
 			None => {}
 		}
 		self.bufremains = 0;
+		self.bufsize = 0;
+		match self.body.as_mut() {
+			Some(bodyref) => {
+				bodyref.clear();
+			}
+			None => {}
+		}
 	}
 
 	async fn from(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
@@ -241,7 +244,7 @@ impl Message {
 		match cl {
 			Some(cl) => {
 				if self.body.is_none() {
-					let mut buf = BytesMut::with_capacity(cl);
+					let buf = BytesMut::with_capacity(cl);
 					self.body = Some(buf);
 				}
 				let bodyref = self.body.as_mut().unwrap();

@@ -1,11 +1,7 @@
-use std::cell::Ref;
 use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool};
-use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tokio::sync::Mutex;
-use tokio::time::sleep;
 use crate::h2tp::cfg::ATOMIC_ORDERING;
 use crate::h2tp::message::Request;
 

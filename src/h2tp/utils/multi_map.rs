@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -29,7 +29,7 @@ impl AryMap {
 	async fn append(&mut self, k: &str, v: &str) {
 		match self.idx(k) {
 			Some(idx) => {
-				let mut guard = self.vals[idx].lock().await;
+				let guard = self.vals[idx].lock().await;
 				let mut vals = (*guard).borrow_mut();
 				vals.push(v.to_string());
 			}
@@ -58,7 +58,7 @@ impl AryMap {
 	async fn reset(&mut self, k: &str, v: &str) {
 		match self.idx(k) {
 			Some(idx) => {
-				let mut guard = self.vals[idx].lock().await;
+				let guard = self.vals[idx].lock().await;
 				let mut vals = (*guard).borrow_mut();
 
 				vals.clear();
@@ -71,7 +71,7 @@ impl AryMap {
 	async unsafe fn get(&self, k: &str) -> Option<&Vec<String>> {
 		return match self.idx(k) {
 			Some(idx) => {
-				let mut guard = self.vals[idx].lock().await;
+				let guard = self.vals[idx].lock().await;
 				let vals = (*guard).borrow();
 				return Some(&(*(vals.as_ref() as *const Vec<String>)));
 			}
@@ -101,7 +101,7 @@ impl MultiMap {
 				let vals = mapref.get_mut(k);
 				match vals {
 					Some(valsref) => {
-						let mut guard = valsref.lock().await;
+						let guard = valsref.lock().await;
 						let mut valsref = (*guard).borrow_mut();
 						valsref.push(v.to_string());
 					}
@@ -118,7 +118,7 @@ impl MultiMap {
 				let aryref = self.ary.as_mut().unwrap();
 				if aryref.keys.len() >= 12 {
 					self.map = Some(HashMap::new());
-					let mut mapref = self.map.as_mut().unwrap();
+					let mapref = self.map.as_mut().unwrap();
 
 					for idx in 0..aryref.keys.len() {
 						let _k = &aryref.keys[idx];
@@ -169,7 +169,7 @@ impl MultiMap {
 				let vals = mapref.get_mut(k);
 				match vals {
 					Some(valsref) => {
-						let mut guard = valsref.lock().await;
+						let guard = valsref.lock().await;
 						let mut vals: RefMut<Vec<String>> = (*guard).borrow_mut();
 						vals.clear();
 						vals.push(v.to_string());
@@ -182,7 +182,7 @@ impl MultiMap {
 			None => {
 				match self.ary.as_mut() {
 					Some(aryref) => {
-						aryref.reset(k, v);
+						aryref.reset(k, v).await;
 					}
 					None => {}
 				}
