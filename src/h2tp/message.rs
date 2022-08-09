@@ -1,18 +1,20 @@
 use std::fmt;
 use std::fmt::{Formatter, write};
-use std::sync::{Mutex, MutexGuard};
 use bytes::BytesMut;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::net::TcpStream;
+use tokio::sync::{Mutex, RwLock};
 use crate::h2tp::cfg::MESSAGE_BUFFER_SIZE;
+use crate::h2tp::headers::Headers;
 use crate::h2tp::utils::multi_map::MultiMap;
 
 pub struct Message {
-	lock: Mutex<()>,
 	startline: (String, String, String),
-	headers: Option<MultiMap>,
+	headers: Option<Headers>,
 	body: Option<BytesMut>,
+
 	buf: Option<BytesMut>,
+	bufsize: usize,
 	bufremains: usize,
 }
 
@@ -83,11 +85,11 @@ const BAD_REQUEST: &'static str = "bad request";
 impl Message {
 	fn new() -> Self {
 		return Self {
-			lock: Mutex::new(()),
 			startline: (String::new(), String::new(), String::new()),
 			headers: None,
 			body: None,
 			buf: None,
+			bufsize: 0,
 			bufremains: 0,
 		};
 	}
@@ -106,10 +108,6 @@ impl Message {
 	}
 
 	async fn from(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
-		let _ = self.lock.lock().unwrap();
-
-		self.clear();
-
 		if self.buf.is_none() {
 			let mut buf = BytesMut::with_capacity(MESSAGE_BUFFER_SIZE);
 			unsafe {
@@ -133,6 +131,7 @@ impl Message {
 				let size = stream.read(bufref).await;
 				match size {
 					Ok(size) => {
+						self.bufsize = size;
 						self.bufremains = size;
 						bufslice = &bufref[0..size];
 					}
@@ -156,6 +155,9 @@ impl Message {
 					}
 
 					skip_newline = false;
+					if status == ParseStatus::HeadersOK {
+						break;
+					}
 					continue;
 				}
 
@@ -187,7 +189,7 @@ impl Message {
 							skip_newline = true;
 							if hkvsep {
 								if self.headers.is_none() {
-									self.headers = Some(MultiMap::new());
+									self.headers = Some(Headers::new());
 								}
 								let headersref = self.headers.as_mut().unwrap();
 								headersref.append(
@@ -202,7 +204,7 @@ impl Message {
 									return Some(ParseError::ue(BAD_REQUEST));
 								}
 								status = ParseStatus::HeadersOK;
-								break;
+								continue;
 							}
 						} else {
 							if hkvsep {
@@ -227,36 +229,106 @@ impl Message {
 			}
 		}
 
-		// match &self.headers {
-		// 	Some(headers) => {
-		// 		headers.each(|k, v| {
-		// 			println!("{}: {}", k, v);
-		// 		});
-		// 	}
-		// 	None => {}
-		// }
+		let mut cl: Option<usize> = None;
+		match &self.headers {
+			Some(href) => {
+				cl = href.content_length();
+			}
+			None => {}
+		}
+
+		match cl {
+			Some(cl) => {
+				if self.body.is_none() {
+					let mut buf = BytesMut::with_capacity(cl);
+					unsafe { buf.set_len(cl); }
+					self.body = Some(buf);
+				}
+				let bodyref = self.body.as_mut().unwrap();
+
+				let mut remain = cl;
+				if self.bufremains > 0 {
+					let begin = self.bufsize - self.bufremains;
+
+					if self.bufremains >= remain {
+						bodyref.copy_from_slice(&bufref[begin..(begin + remain)]);
+						self.bufremains -= remain;
+						remain = 0;
+					} else {
+						bodyref.copy_from_slice(&bufref[begin..(begin + self.bufremains)]);
+						self.bufremains = 0;
+						remain -= self.bufremains;
+					}
+				}
+
+				loop {
+					if remain == 0 {
+						break;
+					}
+
+					let mut rl: usize = remain;
+					if remain > MESSAGE_BUFFER_SIZE {
+						rl = MESSAGE_BUFFER_SIZE;
+					}
+
+					match stream.read(&mut bufref[0..rl]).await {
+						Ok(size) => {
+							if size == 0 {
+								return Some(ParseError::empty());
+							}
+							bodyref.copy_from_slice(&bufref[0..size]);
+							remain -= size;
+						}
+						Err(_) => {}
+					}
+				}
+			}
+			None => {
+				let mut is_chunked = false;
+				match &self.headers {
+					Some(href) => {
+						is_chunked = href.is_chunked();
+					}
+					None => {}
+				}
+				if is_chunked {
+					todo!("chunked body");
+				}
+			}
+		}
 		return None;
 	}
 }
 
-unsafe impl Send for Message {}
-
 pub struct Request {
-	msg: Message,
+	msg: RwLock<Message>,
+}
+
+impl fmt::Debug for Request {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		todo!()
+	}
 }
 
 impl Request {
 	pub fn new() -> Self {
 		return Self {
-			msg: Message::new(),
+			msg: RwLock::new(Message::new()),
 		};
 	}
 
+	pub async fn clear(&mut self) {
+		let mut guard = self.msg.write().await;
+		(*guard).clear();
+	}
 
 	pub async fn from(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
-		let msg = &mut self.msg;
-		return msg.from(stream).await;
+		let mut guard = self.msg.write().await;
+		return (*guard).from(stream).await;
+	}
+
+	pub async fn method(&self) -> &str {
+		let guard = self.msg.read().await;
+		return (*guard).startline.0.as_str();
 	}
 }
-
-unsafe impl Send for Request {}
