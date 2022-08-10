@@ -1,3 +1,5 @@
+extern crate core;
+
 mod h2tp;
 
 use clap::Parser;

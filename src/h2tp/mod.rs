@@ -10,6 +10,7 @@ mod status_code;
 mod methods;
 mod request;
 mod response;
+mod url;
 
 pub fn create_server() -> server::Server {
 	return server::Server::new();
