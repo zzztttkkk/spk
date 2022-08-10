@@ -1,5 +1,5 @@
 use core::fmt;
-use std::fmt::Formatter;
+use std::fmt::{Display, Formatter};
 
 pub struct Url<'a> {
 	scheme: &'a str,
@@ -29,6 +29,14 @@ impl fmt::Debug for ParseErr {
 		write!(f, "UrlParseError: {}", self.msg)
 	}
 }
+
+impl Display for ParseErr {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "UrlParseError: {}", self.msg)
+	}
+}
+
+impl std::error::Error for ParseErr {}
 
 impl<'a> fmt::Debug for Url<'a> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -160,6 +168,6 @@ mod tests {
 	#[test]
 	fn test_parse() {
 		println!("{:?}", Url::parse("http://:4555@a.com:567/ddd?e=45fff#err"));
-		println!("{:?}", Url::parse("er@:45/ddd?rtt"));
+		println!("{:?}", Url::parse("er@:45"));
 	}
 }
