@@ -1,5 +1,28 @@
 use core::fmt;
 use std::fmt::{Display, Formatter};
+use std::mem::MaybeUninit;
+use crate::h2tp::utils::multi_map::MultiMap;
+
+pub struct UrlBuilder {
+	parts: [String; 8],
+	query: Option<MultiMap>,
+}
+
+impl UrlBuilder {
+	fn new() -> Self {
+		unsafe {
+			let parts = MaybeUninit::<[String; 8]>::uninit();
+			let mut obj = Self {
+				parts: parts.assume_init(),
+				query: None,
+			};
+			for ele in &mut obj.parts[..] {
+				*ele = "".to_string();
+			}
+			return obj;
+		}
+	}
+}
 
 pub struct Url<'a> {
 	scheme: &'a str,
@@ -10,6 +33,8 @@ pub struct Url<'a> {
 	path: &'a str,
 	rawquery: &'a str,
 	fragment: &'a str,
+
+	builder: Option<UrlBuilder>,
 }
 
 pub struct ParseErr {
@@ -57,8 +82,8 @@ impl<'a> fmt::Debug for Url<'a> {
 const PATH_MISSING: &'static str = "Path Missing";
 
 impl<'a> Url<'a> {
-	pub fn parse(v: &'a str) -> Result<Self, ParseErr> {
-		let mut obj = Self {
+	pub fn new() -> Self {
+		return Self {
 			scheme: "",
 			username: "",
 			password: "",
@@ -67,8 +92,12 @@ impl<'a> Url<'a> {
 			path: "",
 			rawquery: "",
 			fragment: "",
+			builder: None,
 		};
+	}
 
+	pub fn parse(v: &'a str) -> Result<Self, ParseErr> {
+		let mut obj = Self::new();
 		match obj.from(v) {
 			Some(e) => {
 				Err(e)
@@ -158,6 +187,17 @@ impl<'a> Url<'a> {
 			}
 		}
 		return None;
+	}
+
+	pub fn builder<'b>(mut self) -> &'b mut UrlBuilder {
+		if self.builder.is_none() {
+			self.builder = Some(UrlBuilder::new());
+			let bref = self.builder.as_mut().unwrap();
+			self.scheme = bref.parts[0].as_str();
+			self.username = bref.parts[1].as_str();
+			self.password = bref.parts[2].as_str();
+		}
+		return self.builder.as_mut().unwrap();
 	}
 }
 
