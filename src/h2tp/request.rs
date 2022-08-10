@@ -51,7 +51,7 @@ impl Request {
 		self.msg.clear();
 	}
 
-	pub async fn from(&mut self, stream: &mut ReadHalf) -> Option<ParseError> {
+	pub async fn from<'sl>(&mut self, stream: &mut ReadHalf<'sl>) -> Option<ParseError> {
 		return self.msg.from(stream).await;
 	}
 

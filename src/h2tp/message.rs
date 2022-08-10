@@ -112,7 +112,7 @@ impl Message {
 		}
 	}
 
-	pub async fn read(&mut self, stream: &mut ReadHalf) -> Option<ParseError> {
+	pub async fn read<'sl>(&mut self, stream: &mut ReadHalf<'sl>) -> Option<ParseError> {
 		if self.bufremains > 0 {
 			return None;
 		}
@@ -132,7 +132,7 @@ impl Message {
 		return None;
 	}
 
-	pub async fn read_sized_body(&mut self, stream: &mut ReadHalf, cl: usize) -> Option<ParseError> {
+	pub async fn read_sized_body<'sl>(&mut self, stream: &mut ReadHalf<'sl>, cl: usize) -> Option<ParseError> {
 		if cl == 0 {
 			return None;
 		}
@@ -167,7 +167,7 @@ impl Message {
 		return None;
 	}
 
-	pub async fn read_byte(&mut self, stream: &mut ReadHalf) -> Result<u8, ParseError> {
+	pub async fn read_byte<'sl>(&mut self, stream: &mut ReadHalf<'sl>) -> Result<u8, ParseError> {
 		let bufref = self.buf.as_mut().unwrap().as_mut();
 
 		let c: u8;
@@ -187,7 +187,7 @@ impl Message {
 		return Ok(c);
 	}
 
-	pub async fn read_chunked_body(&mut self, stream: &mut ReadHalf) -> Option<ParseError> {
+	pub async fn read_chunked_body<'sl>(&mut self, stream: &mut ReadHalf<'sl>) -> Option<ParseError> {
 		let mut current_chunk_size: Option<usize> = None;
 		let mut numbuf = String::new();
 		let mut skip_newline = false;
@@ -270,7 +270,7 @@ impl Message {
 		return None;
 	}
 
-	pub async fn read_body(&mut self, stream: &mut ReadHalf) -> Option<ParseError> {
+	pub async fn read_body<'sl>(&mut self, stream: &mut ReadHalf<'sl>) -> Option<ParseError> {
 		let mut cl: Option<usize> = None;
 		match &self.headers {
 			Some(href) => {
@@ -317,7 +317,7 @@ impl Message {
 		return None;
 	}
 
-	pub async fn from(&mut self, stream: &mut ReadHalf) -> Option<ParseError> {
+	pub async fn from<'sl>(&mut self, stream: &mut ReadHalf<'sl>) -> Option<ParseError> {
 		if self.buf.is_none() {
 			let mut buf = BytesMut::with_capacity(MESSAGE_BUFFER_SIZE);
 			unsafe {
