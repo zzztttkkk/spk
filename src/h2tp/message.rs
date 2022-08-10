@@ -5,12 +5,13 @@ use tokio::io::{AsyncReadExt};
 use tokio::net::TcpStream;
 use crate::h2tp::cfg::MESSAGE_BUFFER_SIZE;
 use crate::h2tp::headers::Headers;
+use crate::h2tp::status_code::StatusCode;
+use tokio::net::tcp::ReadHalf;
 
 pub struct Message {
-	startline: (String, String, String),
-	headers: Option<Headers>,
-	body: Option<BytesMut>,
-
+	pub startline: (String, String, String),
+	pub headers: Option<Headers>,
+	pub body: Option<BytesMut>,
 	buf: Option<BytesMut>,
 	bufsize: usize,
 	bufremains: usize,
@@ -80,7 +81,7 @@ impl fmt::Debug for ParseError {
 const BAD_REQUEST: &'static str = "bad request";
 
 impl Message {
-	fn new() -> Self {
+	pub fn new() -> Self {
 		return Self {
 			startline: (String::new(), String::new(), String::new()),
 			headers: None,
@@ -91,7 +92,7 @@ impl Message {
 		};
 	}
 
-	fn clear(&mut self) {
+	pub fn clear(&mut self) {
 		self.startline.0.clear();
 		self.startline.1.clear();
 		self.startline.2.clear();
@@ -111,28 +112,27 @@ impl Message {
 		}
 	}
 
-	async fn read(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
-		let bufref = self.buf.as_mut().unwrap().as_mut();
+	pub async fn read(&mut self, stream: &mut ReadHalf) -> Option<ParseError> {
 		if self.bufremains > 0 {
 			return None;
-		} else {
-			match stream.read(&mut bufref[0..MESSAGE_BUFFER_SIZE]).await {
-				Ok(size) => {
-					if size == 0 {
-						return Some(ParseError::empty());
-					}
-					self.bufremains = size;
-					self.bufsize = size;
+		}
+
+		match stream.read(self.buf.as_mut().unwrap().as_mut()).await {
+			Ok(size) => {
+				if size == 0 {
+					return Some(ParseError::empty());
 				}
-				Err(e) => {
-					return Some(ParseError::ioe(e));
-				}
+				self.bufremains = size;
+				self.bufsize = size;
+			}
+			Err(e) => {
+				return Some(ParseError::ioe(e));
 			}
 		}
 		return None;
 	}
 
-	async fn read_sized_body(&mut self, stream: &mut TcpStream, cl: usize) -> Option<ParseError> {
+	pub async fn read_sized_body(&mut self, stream: &mut ReadHalf, cl: usize) -> Option<ParseError> {
 		if cl == 0 {
 			return None;
 		}
@@ -167,7 +167,7 @@ impl Message {
 		return None;
 	}
 
-	async fn read_byte(&mut self, stream: &mut TcpStream) -> Result<u8, ParseError> {
+	pub async fn read_byte(&mut self, stream: &mut ReadHalf) -> Result<u8, ParseError> {
 		let bufref = self.buf.as_mut().unwrap().as_mut();
 
 		let c: u8;
@@ -187,7 +187,7 @@ impl Message {
 		return Ok(c);
 	}
 
-	async fn read_chunked_body(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
+	pub async fn read_chunked_body(&mut self, stream: &mut ReadHalf) -> Option<ParseError> {
 		let mut current_chunk_size: Option<usize> = None;
 		let mut numbuf = String::new();
 		let mut skip_newline = false;
@@ -270,7 +270,7 @@ impl Message {
 		return None;
 	}
 
-	async fn read_body(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
+	pub async fn read_body(&mut self, stream: &mut ReadHalf) -> Option<ParseError> {
 		let mut cl: Option<usize> = None;
 		match &self.headers {
 			Some(href) => {
@@ -317,7 +317,7 @@ impl Message {
 		return None;
 	}
 
-	async fn from(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
+	pub async fn from(&mut self, stream: &mut ReadHalf) -> Option<ParseError> {
 		if self.buf.is_none() {
 			let mut buf = BytesMut::with_capacity(MESSAGE_BUFFER_SIZE);
 			unsafe {
@@ -426,54 +426,5 @@ impl Message {
 			}
 		}
 		return self.read_body(stream).await;
-	}
-}
-
-pub struct Request {
-	msg: Message, // Arc<Mutex<Message>>
-}
-
-impl fmt::Debug for Request {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "Request <{} {} {} @ {:#x}>",
-			   self.method(), self.path(), self.version(),
-			   (self as *const Request as u64),
-		)
-	}
-}
-
-impl Request {
-	pub fn new() -> Self {
-		return Self {
-			msg: Message::new(),
-		};
-	}
-
-	pub fn clear(&mut self) {
-		self.msg.clear();
-	}
-
-	pub async fn from(&mut self, stream: &mut TcpStream) -> Option<ParseError> {
-		return self.msg.from(stream).await;
-	}
-
-	pub fn method(&self) -> &str {
-		return self.msg.startline.0.as_str();
-	}
-
-	pub fn path(&self) -> &str {
-		return self.msg.startline.1.as_str();
-	}
-
-	pub fn version(&self) -> &str {
-		return self.msg.startline.2.as_str();
-	}
-
-	pub fn headers(&self) -> Option<&Headers> {
-		return self.msg.headers.as_ref();
-	}
-
-	pub fn body(&self) -> Option<&BytesMut> {
-		return self.msg.body.as_ref();
 	}
 }

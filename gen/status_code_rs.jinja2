@@ -1,0 +1,18 @@
+// generate by "gen/gen_status_code.py"
+
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub enum StatusCode {
+{%- for ele in items %}
+	{{ele.name}} = {{ele.num}},
+{%- endfor %}
+}
+
+impl StatusCode {
+	fn msg(&self) -> &'static str {
+		match self {
+		{%- for ele in items %}
+			StatusCode::{{ele.name}} => "{{ele.msg}}",
+		{%- endfor %}
+		}
+	}
+}
