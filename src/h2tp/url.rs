@@ -1,26 +1,41 @@
 use core::fmt;
 use std::fmt::{Display, Formatter};
-use std::mem::MaybeUninit;
 use crate::h2tp::utils::multi_map::MultiMap;
 
-pub struct UrlBuilder {
+pub struct Builder<'a> {
+	writable: &'a mut Setter,
+}
+
+macro_rules! simple_setter {
+    ($field:ident, $idx:expr) => {
+		pub fn $field(&mut self, v: &str) -> &mut Self {
+			self.writable.parts[$idx] = v.to_string();
+			return self;
+		}
+	};
+}
+
+impl<'a> Builder<'a> {
+	fn new(w: &'a mut Setter) -> Self {
+		return Self {
+			writable: w,
+		};
+	}
+
+	simple_setter!(scheme, 0);
+}
+
+struct Setter {
 	parts: [String; 8],
 	query: Option<MultiMap>,
 }
 
-impl UrlBuilder {
+impl Setter {
 	fn new() -> Self {
-		unsafe {
-			let parts = MaybeUninit::<[String; 8]>::uninit();
-			let mut obj = Self {
-				parts: parts.assume_init(),
-				query: None,
-			};
-			for ele in &mut obj.parts[..] {
-				*ele = "".to_string();
-			}
-			return obj;
-		}
+		return Self {
+			parts: Default::default(),
+			query: None,
+		};
 	}
 }
 
@@ -34,7 +49,7 @@ pub struct Url<'a> {
 	rawquery: &'a str,
 	fragment: &'a str,
 
-	builder: Option<UrlBuilder>,
+	setter: Option<Setter>,
 }
 
 pub struct ParseErr {
@@ -42,23 +57,15 @@ pub struct ParseErr {
 }
 
 impl ParseErr {
-	fn new(m: &'static str) -> Self {
-		return Self {
-			msg: m,
-		};
-	}
+	fn new(m: &'static str) -> Self { Self { msg: m } }
 }
 
 impl fmt::Debug for ParseErr {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "UrlParseError: {}", self.msg)
-	}
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result { write!(f, "UrlParseError: {}", self.msg) }
 }
 
 impl Display for ParseErr {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "UrlParseError: {}", self.msg)
-	}
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result { write!(f, "UrlParseError: {}", self.msg) }
 }
 
 impl std::error::Error for ParseErr {}
@@ -67,7 +74,7 @@ impl<'a> fmt::Debug for Url<'a> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		write!(f,
 			   "Url(\n\tScheme: {}\n\tUsername: {}\n\tPassword: {}\n\tHost: {}\n\tPort: {}\n\tPath: {}\n\tRawQuery: {}\n\tFragment: {}\n)",
-			   self.scheme,
+			   self.scheme(),
 			   self.username,
 			   self.password,
 			   self.host,
@@ -81,6 +88,21 @@ impl<'a> fmt::Debug for Url<'a> {
 
 const PATH_MISSING: &'static str = "Path Missing";
 
+macro_rules! simple_getter {
+    ($field:ident, $idx:expr) => {
+		pub fn $field(&self) -> &str {
+			match self.writable.as_ref() {
+				Some(wref) => {
+					&(wref.parts[$idx])
+				}
+				None => {
+					self.$field
+				}
+			}
+		}
+	};
+}
+
 impl<'a> Url<'a> {
 	pub fn new() -> Self {
 		return Self {
@@ -92,7 +114,7 @@ impl<'a> Url<'a> {
 			path: "",
 			rawquery: "",
 			fragment: "",
-			builder: None,
+			setter: None,
 		};
 	}
 
@@ -189,25 +211,27 @@ impl<'a> Url<'a> {
 		return None;
 	}
 
-	pub fn builder<'b>(mut self) -> &'b mut UrlBuilder {
-		if self.builder.is_none() {
-			self.builder = Some(UrlBuilder::new());
-			let bref = self.builder.as_mut().unwrap();
-			self.scheme = bref.parts[0].as_str();
-			self.username = bref.parts[1].as_str();
-			self.password = bref.parts[2].as_str();
+	pub fn builder(&mut self) -> Builder {
+		if self.setter.is_none() {
+			self.setter = Some(Setter::new());
 		}
-		return self.builder.as_mut().unwrap();
+		return Builder::new(self.setter.as_mut().unwrap());
 	}
+
+	simple_getter!(scheme, 0);
 }
 
 #[cfg(test)]
 mod tests {
-	use crate::h2tp::url::Url;
+	use crate::h2tp::url::{Url, Builder};
 
 	#[test]
 	fn test_parse() {
-		println!("{:?}", Url::parse("http://:4555@a.com:567/ddd?e=45fff#err"));
+		println!("{:?}", Url::parse("https://:4555@a.com:567/ddd?e=45fff#err"));
 		println!("{:?}", Url::parse("er@:45"));
+
+		let mut url = Url::new();
+		url.builder().scheme("XXX");
+		println!("V: {}", url.scheme());
 	}
 }
