@@ -1,3 +1,6 @@
+use std::sync::{Arc};
+use tokio::sync::Mutex;
+
 mod server;
 mod conn;
 mod cfg;
@@ -12,6 +15,16 @@ mod request;
 mod response;
 mod url;
 
-pub fn create_server() -> server::Server {
+pub async fn shutdown(handler: &Arc<Mutex<server::ShutdownHandler>>, timout: u64) {
+	let mut guard = handler.lock().await;
+	if (*guard).shutdown(timout).await {
+		println!("Graceful Shutdown OK");
+	} else {
+		println!("Graceful Shutdown Failed");
+	}
+}
+
+pub fn server() -> server::Server {
 	return server::Server::new();
 }
+

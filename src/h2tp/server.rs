@@ -1,39 +1,61 @@
-use std::sync::Arc;
+use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::time::Duration;
 use tokio::net::{TcpListener};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio::sync::Mutex;
 use tokio::time::sleep;
 use crate::h2tp::conn::Conn;
 use crate::h2tp::cfg::ATOMIC_ORDERING;
 
 pub struct Server {
 	listener: Option<TcpListener>,
-	shutdown_signal_receiver: Option<UnboundedReceiver<()>>,
-	before_shutdown: Option<fn()>,
-	shutdown_done_sender: Option<UnboundedSender<bool>>,
-	shutdown_timeout: u64,
+	closing: Arc<AtomicBool>,
+	shutdown_signal_receiver: UnboundedReceiver<()>,
+	shutdown_done_sender: UnboundedSender<()>,
+	shutdownhandler: Arc<Mutex<ShutdownHandler>>,
+}
+
+pub struct ShutdownHandler {
+	signal_sender: UnboundedSender<()>,
+	done_receiver: UnboundedReceiver<()>,
+}
+
+impl ShutdownHandler {
+	pub async fn shutdown(&mut self, ms: u64) -> bool {
+		match self.signal_sender.send(()) {
+			Ok(_) => {}
+			Err(_) => {
+				return false;
+			}
+		}
+		tokio::select! {
+			_ = self.done_receiver.recv() => {
+				return true;
+			},
+			_ = sleep(Duration::from_millis(ms)) =>{
+				return false;
+			}
+		}
+	}
 }
 
 impl Server {
 	pub fn new() -> Self {
-		return Self {
+		let (stx, srx) = unbounded_channel();
+		let (dtx, drx) = unbounded_channel();
+		let mut obj = Self {
 			listener: None,
-			shutdown_signal_receiver: None,
-			before_shutdown: None,
-			shutdown_done_sender: None,
-			shutdown_timeout: 0,
+			closing: Arc::new(AtomicBool::new(false)),
+			shutdown_signal_receiver: srx,
+			shutdown_done_sender: dtx,
+			shutdownhandler: Arc::new(Mutex::new(ShutdownHandler { signal_sender: stx, done_receiver: drx })),
 		};
+		return obj;
 	}
 
-	pub fn graceful_shutdown(&mut self, timeout: u64, func: Option<fn()>) -> (UnboundedSender<()>, UnboundedReceiver<bool>) {
-		self.shutdown_timeout = timeout;
-		let (signal_sender, signal_receiver) = tokio::sync::mpsc::unbounded_channel();
-		self.shutdown_signal_receiver = Some(signal_receiver);
-		self.before_shutdown = func;
-		let (done_sender, done_receiver) = tokio::sync::mpsc::unbounded_channel();
-		self.shutdown_done_sender = Some(done_sender);
-		return (signal_sender, done_receiver);
+	pub fn shutdownhandler(&self) -> Arc<Mutex<ShutdownHandler>> {
+		return self.shutdownhandler.clone();
 	}
 
 	pub async fn listen<Addr: tokio::net::ToSocketAddrs>(&mut self, addr: Addr) {
@@ -41,31 +63,15 @@ impl Server {
 		let lref = self.listener.as_ref().unwrap();
 
 		println!("Listening...");
+		let alive_conn_count = Arc::new(AtomicU64::new(0));
 
-		if self.shutdown_signal_receiver.is_none() {
-			loop {
-				match lref.accept().await {
-					Ok((stream, _)) => {
-						tokio::spawn(async move {
-							let mut conn = Conn::new(stream, None);
-							conn.handle().await;
-						});
-					}
-					Err(_) => {}
-				}
-			}
-		} else {
-			let rref = self.shutdown_signal_receiver.as_mut().unwrap();
-			let alive_conn_count = Arc::new(AtomicU64::new(0));
-			let closing = Arc::new(AtomicBool::new(false));
-
-			loop {
-				tokio::select! {
+		loop {
+			tokio::select! {
 					result = lref.accept() => {
 						match result {
 							Ok((stream, _))=>{
 								let alive_conn_count_clone = Arc::clone(&alive_conn_count);
-								let closing_clone = Arc::clone(&closing);
+								let closing_clone = Arc::clone(&self.closing);
 								tokio::spawn(async move {
 									alive_conn_count_clone.fetch_add(1, ATOMIC_ORDERING);
 									let mut conn = Conn::new(stream, Some(closing_clone));
@@ -76,43 +82,22 @@ impl Server {
 							Err(_)=>{}
 						}
 					},
-					_ = rref.recv() => {
-						match self.before_shutdown {
-							Some(before_shutdown)=>{
-								before_shutdown();
-							},
-							None=>{}
-						}
-						closing.store(true, ATOMIC_ORDERING);
+					_ = self.shutdown_signal_receiver.recv() => {
+						self.closing.store(true, ATOMIC_ORDERING);
 						println!("Closing...");
 						break;
 					}
-				}
 			}
-
-			let mut timeout = self.shutdown_timeout;
-			if timeout < 3000 {
-				timeout = 3000;
-			}
-			let (q, r) = (timeout / 100, timeout % 100);
-			if r != 0 {
-				timeout = (q + 1) * 100;
-			}
-
-			let duration = Duration::from_millis(100);
-			loop {
-				if alive_conn_count.load(ATOMIC_ORDERING) != 0 {
-					sleep(duration).await;
-					timeout -= 100;
-					if timeout == 0 {
-						break;
-					}
-					continue;
-				}
-				break;
-			}
-
-			self.shutdown_done_sender.as_ref().unwrap().send(alive_conn_count.load(ATOMIC_ORDERING) == 0).err();
 		}
+
+		let duration = Duration::from_millis(100);
+		loop {
+			if alive_conn_count.load(ATOMIC_ORDERING) != 0 {
+				sleep(duration).await;
+				continue;
+			}
+			break;
+		}
+		self.shutdown_done_sender.send(()).err();
 	}
 }
