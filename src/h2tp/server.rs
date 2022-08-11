@@ -44,14 +44,13 @@ impl Server {
 	pub fn new() -> Self {
 		let (stx, srx) = unbounded_channel();
 		let (dtx, drx) = unbounded_channel();
-		let mut obj = Self {
+		return Self {
 			listener: None,
 			closing: Arc::new(AtomicBool::new(false)),
 			shutdown_signal_receiver: srx,
 			shutdown_done_sender: dtx,
 			shutdownhandler: Arc::new(Mutex::new(ShutdownHandler { signal_sender: stx, done_receiver: drx })),
 		};
-		return obj;
 	}
 
 	pub fn shutdownhandler(&self) -> Arc<Mutex<ShutdownHandler>> {

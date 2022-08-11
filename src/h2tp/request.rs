@@ -1,7 +1,6 @@
 use std::fmt;
 use bytes::BytesMut;
 use tokio::net::tcp::ReadHalf;
-use tokio::net::TcpStream;
 use crate::h2tp::headers::Headers;
 use crate::h2tp::message::{Message, ParseError};
 
