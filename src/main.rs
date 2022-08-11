@@ -1,5 +1,4 @@
-extern crate core;
-
+#![allow(dead_code, unused_imports, unused)]
 mod h2tp;
 
 use clap::Parser;

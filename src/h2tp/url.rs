@@ -3,13 +3,13 @@ use std::fmt::{Display, Formatter};
 use crate::h2tp::utils::multi_map::MultiMap;
 
 pub struct Builder<'a> {
-	writable: &'a mut Setter,
+	setter: &'a mut Setter,
 }
 
 macro_rules! simple_setter {
-    ($field:ident, $idx:expr) => {
-		pub fn $field(&mut self, v: &str) -> &mut Self {
-			self.writable.parts[$idx] = v.to_string();
+    ($field:ident, $idx:expr, $vtype:ty) => {
+		pub fn $field(&mut self, v: $vtype) -> &mut Self {
+			self.setter.parts[$idx] = v.to_string();
 			return self;
 		}
 	};
@@ -18,11 +18,27 @@ macro_rules! simple_setter {
 impl<'a> Builder<'a> {
 	fn new(w: &'a mut Setter) -> Self {
 		return Self {
-			writable: w,
+			setter: w,
 		};
 	}
 
-	simple_setter!(scheme, 0);
+	simple_setter!(scheme, 0, &str);
+	simple_setter!(username, 1, &str);
+	simple_setter!(password, 2, &str);
+	simple_setter!(host, 3, &str);
+	simple_setter!(port, 4, u16);
+
+	pub fn path(&mut self, v: &str) -> &mut Self {
+		let vref = &mut self.setter.parts[5];
+		vref.clear();
+		if !v.is_empty() {
+			if v.chars().nth(0).unwrap() != (b'/' as char) {
+				vref.push(b'/' as char);
+			}
+			vref.push_str(v);
+		}
+		return self;
+	}
 }
 
 struct Setter {
@@ -91,7 +107,7 @@ const PATH_MISSING: &'static str = "Path Missing";
 macro_rules! simple_getter {
     ($field:ident, $idx:expr) => {
 		pub fn $field(&self) -> &str {
-			match self.writable.as_ref() {
+			match self.setter.as_ref() {
 				Some(wref) => {
 					&(wref.parts[$idx])
 				}
@@ -223,7 +239,7 @@ impl<'a> Url<'a> {
 
 #[cfg(test)]
 mod tests {
-	use crate::h2tp::url::{Url, Builder};
+	use crate::h2tp::url::{Url};
 
 	#[test]
 	fn test_parse() {
@@ -231,7 +247,7 @@ mod tests {
 		println!("{:?}", Url::parse("er@:45"));
 
 		let mut url = Url::new();
-		url.builder().scheme("XXX");
-		println!("V: {}", url.scheme());
+		url.builder().scheme("XXX").port(12555);
+		println!("Scheme: {}", url.scheme());
 	}
 }

@@ -140,7 +140,6 @@ impl MultiMap {
 		}
 	}
 
-	#[allow(dead_code)]
 	pub fn remove(&mut self, k: &str) {
 		match self.map.as_mut() {
 			Some(mapref) => {
@@ -157,7 +156,6 @@ impl MultiMap {
 		}
 	}
 
-	#[allow(dead_code)]
 	pub fn reset(&mut self, k: &str, v: &str) {
 		match self.map.as_mut() {
 			Some(mapref) => {
@@ -212,7 +210,6 @@ impl MultiMap {
 		};
 	}
 
-	#[allow(dead_code)]
 	pub fn each(&self, func: fn(k: &str, v: &str)) {
 		match self.map.as_ref() {
 			Some(mapref) => {

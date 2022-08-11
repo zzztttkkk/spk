@@ -3,6 +3,7 @@ import os
 import pathlib
 import threading
 import typing
+import jinja2
 
 cwd = pathlib.Path(os.path.abspath(__file__)).parent.absolute()
 
@@ -23,3 +24,12 @@ def log(msg: str, *args: typing.Any):
 				break
 			filename = ""
 		print(f"{filename}: {msg.format(*args)}")
+
+
+def render(fn: str, tpl: str, **kwargs):
+	env = jinja2.Environment(loader=jinja2.FileSystemLoader("./"))
+	tpl = env.get_template(tpl)
+
+	with open(fn, "w+") as f:
+		f.truncate(0)
+		f.write(tpl.render(**kwargs))

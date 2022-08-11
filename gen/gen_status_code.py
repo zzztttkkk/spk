@@ -4,7 +4,6 @@ import time
 
 import requests
 from bs4 import BeautifulSoup
-import jinja2
 
 from gen import base
 
@@ -52,11 +51,5 @@ def run():
 		base.log("empty items")
 		return
 
-	env = jinja2.Environment(loader=jinja2.FileSystemLoader("./"))
-	tpl = env.get_template("status_code_rs.jinja2")
-
-	with open(distfn, "w+") as f:
-		f.truncate(0)
-		f.write(tpl.render(items=items))
-
+	base.render(distfn, "status_code.jinja2", items=items)
 	base.log("done")

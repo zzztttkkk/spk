@@ -2,10 +2,8 @@ use std::fmt;
 use std::fmt::{Formatter};
 use bytes::BytesMut;
 use tokio::io::{AsyncReadExt};
-use tokio::net::TcpStream;
 use crate::h2tp::cfg::MESSAGE_BUFFER_SIZE;
 use crate::h2tp::headers::Headers;
-use crate::h2tp::status_code::StatusCode;
 use tokio::net::tcp::ReadHalf;
 
 pub struct Message {
