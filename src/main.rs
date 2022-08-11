@@ -1,4 +1,5 @@
 #![allow(dead_code, unused_imports, unused)]
+
 mod h2tp;
 
 use clap::Parser;
@@ -9,7 +10,7 @@ struct Args {
 	#[clap(short, long, default_value = "127.0.0.1:8080")]
 	addr: String,
 
-	#[clap(short, long, default_value_t = 3000)]
+	#[clap(short, long, default_value = "3000")]
 	shutdown_timeout: u64,
 }
 
@@ -23,7 +24,10 @@ async fn main() {
 
 	let mut server = h2tp::create_server();
 
-	let (shutdown_signal_sender, mut shutdown_done_receiver) = server.graceful_shutdown(args.shutdown_timeout, None);
+	let (
+		shutdown_signal_sender,
+		mut shutdown_done_receiver
+	) = server.graceful_shutdown(args.shutdown_timeout, None);
 
 	tokio::spawn(async move {
 		server.listen(args.addr).await;
