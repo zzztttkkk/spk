@@ -168,9 +168,9 @@ impl Server {
 					}
 				},
 				_ = self.shutdown_signal_receiver.recv() => {
-						closing.store(true, ATOMIC_ORDERING);
-						println!("Closing...");
-						break;
+					closing.store(true, ATOMIC_ORDERING);
+					println!("Closing...");
+					break;
 				}
 			}
 		}
