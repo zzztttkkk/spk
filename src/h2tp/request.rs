@@ -9,11 +9,11 @@ pub struct Request {
 	msg: Message,
 }
 
-pub struct RequestBuild<'req> {
+pub struct Builder<'req> {
 	req: &'req mut Request,
 }
 
-impl<'req> RequestBuild<'req> {
+impl<'req> Builder<'req> {
 	fn new(v: &'req mut Request) -> Self {
 		return Self {
 			req: v,
@@ -87,7 +87,7 @@ impl Request {
 		return self.msg.body.as_ref();
 	}
 
-	pub fn builder(&mut self) -> RequestBuild {
-		return RequestBuild::new(self);
+	pub fn builder(&mut self) -> Builder {
+		return Builder::new(self);
 	}
 }

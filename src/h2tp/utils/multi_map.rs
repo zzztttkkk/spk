@@ -275,7 +275,7 @@ mod tests {
 	}
 
 	impl fmt::Debug for Obj {
-		fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 			write!(f, "{} @ {}", self.num, (self as *const Obj as u64))
 		}
 	}

@@ -1,5 +1,6 @@
 use std::fmt;
 use std::fmt::{Formatter};
+use std::io::ErrorKind;
 use bytes::BytesMut;
 use tokio::io::{AsyncReadExt};
 use crate::h2tp::cfg::MESSAGE_BUFFER_SIZE;
@@ -53,6 +54,17 @@ impl ParseError {
 
 	pub fn is_empty(&self) -> bool {
 		return self.ioe.is_none() && self.ue.is_none();
+	}
+
+	pub fn is_eof(&self) -> bool {
+		return match self.ioe.as_ref() {
+			Some(v) => {
+				v.kind() == ErrorKind::UnexpectedEof
+			}
+			None => {
+				false
+			}
+		};
 	}
 }
 
