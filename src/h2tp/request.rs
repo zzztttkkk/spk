@@ -1,8 +1,10 @@
 use std::fmt;
 use bytes::BytesMut;
 use tokio::net::tcp::ReadHalf;
+use crate::h2tp::headers;
 use crate::h2tp::headers::Headers;
 use crate::h2tp::message::{Message, ParseError};
+use crate::h2tp::url::Url;
 
 pub struct Request {
 	msg: Message,
@@ -19,13 +21,25 @@ impl<'req> RequestBuild<'req> {
 		};
 	}
 
-	fn method(&mut self, method: &str) -> &mut Self {
+	pub fn method(&mut self, method: &str) -> &mut Self {
 		self.req.msg.startline.0 = method.to_string();
 		return self;
 	}
 
-	fn path(&mut self, path: &str) -> &mut Self {
+	pub fn rawpath(&mut self, path: &str) -> &mut Self {
+		self.req.msg.startline.1 = path.to_string();
 		return self;
+	}
+
+	pub fn url(&mut self, url: &Url) -> &mut Self {
+		let pathref = &mut self.req.msg.startline.1;
+		pathref.clear();
+		url.to(pathref).unwrap();
+		return self;
+	}
+
+	pub fn headers(&mut self) -> headers::Builder {
+		return self.req.msg.headers_builder();
 	}
 }
 

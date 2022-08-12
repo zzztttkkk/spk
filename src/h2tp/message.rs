@@ -1,10 +1,11 @@
 use std::fmt;
-use std::fmt::{Formatter};
+use std::fmt::{Formatter, Write};
 use bytes::BytesMut;
 use tokio::io::{AsyncReadExt};
 use crate::h2tp::cfg::MESSAGE_BUFFER_SIZE;
 use crate::h2tp::headers::Headers;
 use tokio::net::tcp::ReadHalf;
+use crate::h2tp::headers;
 
 pub struct Message {
 	pub startline: (String, String, String),
@@ -96,7 +97,7 @@ impl Message {
 		self.startline.2.clear();
 		match self.headers.as_mut() {
 			Some(href) => {
-				href.clear();
+				href.builder().clear();
 			}
 			None => {}
 		}
@@ -388,7 +389,7 @@ impl Message {
 									self.headers = Some(Headers::new());
 								}
 								let headersref = self.headers.as_mut().unwrap();
-								headersref.append(
+								headersref.builder().append(
 									&hkey.trim().to_ascii_lowercase(),
 									&hval.trim(),
 								);
@@ -424,5 +425,12 @@ impl Message {
 			}
 		}
 		return self.read_body(stream).await;
+	}
+
+	pub fn headers_builder(&mut self) -> headers::Builder {
+		if self.headers.is_none() {
+			self.headers = Some(Headers::new());
+		}
+		return self.headers.as_mut().unwrap().builder();
 	}
 }

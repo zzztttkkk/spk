@@ -1,5 +1,5 @@
 use core::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Display, Error, Formatter, Write};
 use crate::h2tp::utils::multi_map::MultiMap;
 
 pub struct Builder<'a> {
@@ -104,17 +104,19 @@ impl<'a> fmt::Debug for Url<'a> {
 
 const PATH_MISSING: &'static str = "Path Missing";
 
-macro_rules! simple_getter {
+macro_rules! getter {
     ($field:ident, $idx:expr) => {
 		pub fn $field(&self) -> &str {
 			match self.setter.as_ref() {
-				Some(wref) => {
-					&(wref.parts[$idx])
+				Some(sref) => {
+					let vref = &(sref.parts[$idx]);
+					if !vref.is_empty() {
+						return vref;
+					}
 				}
-				None => {
-					self.$field
-				}
+				None => {}
 			}
+			return self.$field;
 		}
 	};
 }
@@ -234,7 +236,11 @@ impl<'a> Url<'a> {
 		return Builder::new(self.setter.as_mut().unwrap());
 	}
 
-	simple_getter!(scheme, 0);
+	pub fn to<W: Write>(&self, dist: &mut W) -> Result<(), Error> {
+		dist.write_char('-' as char)
+	}
+
+	getter!(scheme, 0);
 }
 
 #[cfg(test)]
