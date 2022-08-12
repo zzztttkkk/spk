@@ -1,11 +1,10 @@
 use std::fmt;
-use std::fmt::{Formatter, Write};
+use std::fmt::{Formatter};
 use bytes::BytesMut;
 use tokio::io::{AsyncReadExt};
 use crate::h2tp::cfg::MESSAGE_BUFFER_SIZE;
 use crate::h2tp::headers::Headers;
-use tokio::net::tcp::ReadHalf;
-use crate::h2tp::headers;
+use crate::h2tp::{headers, types};
 
 pub struct Message {
 	pub startline: (String, String, String),
@@ -111,7 +110,7 @@ impl Message {
 		}
 	}
 
-	pub async fn read<'sl>(&mut self, stream: &mut ReadHalf<'sl>) -> Option<ParseError> {
+	pub async fn read<R: tokio::io::AsyncRead + Unpin>(&mut self, stream: &mut R) -> Option<ParseError> {
 		if self.bufremains > 0 {
 			return None;
 		}
@@ -131,7 +130,7 @@ impl Message {
 		return None;
 	}
 
-	pub async fn read_sized_body<'sl>(&mut self, stream: &mut ReadHalf<'sl>, cl: usize) -> Option<ParseError> {
+	pub async fn read_sized_body<R: types::AsyncReader>(&mut self, stream: &mut R, cl: usize) -> Option<ParseError> {
 		if cl == 0 {
 			return None;
 		}
@@ -166,7 +165,7 @@ impl Message {
 		return None;
 	}
 
-	pub async fn read_byte<'sl>(&mut self, stream: &mut ReadHalf<'sl>) -> Result<u8, ParseError> {
+	pub async fn read_byte<R: types::AsyncReader>(&mut self, stream: &mut R) -> Result<u8, ParseError> {
 		let bufref = self.buf.as_mut().unwrap().as_mut();
 
 		let c: u8;
@@ -186,7 +185,7 @@ impl Message {
 		return Ok(c);
 	}
 
-	pub async fn read_chunked_body<'sl>(&mut self, stream: &mut ReadHalf<'sl>) -> Option<ParseError> {
+	pub async fn read_chunked_body<R: types::AsyncReader>(&mut self, stream: &mut R) -> Option<ParseError> {
 		let mut current_chunk_size: Option<usize> = None;
 		let mut numbuf = String::new();
 		let mut skip_newline = false;
@@ -269,7 +268,7 @@ impl Message {
 		return None;
 	}
 
-	pub async fn read_body<'sl>(&mut self, stream: &mut ReadHalf<'sl>) -> Option<ParseError> {
+	pub async fn read_body<R: types::AsyncReader>(&mut self, stream: &mut R) -> Option<ParseError> {
 		let mut cl: Option<usize> = None;
 		match &self.headers {
 			Some(href) => {
@@ -316,7 +315,7 @@ impl Message {
 		return None;
 	}
 
-	pub async fn from<'sl>(&mut self, stream: &mut ReadHalf<'sl>) -> Option<ParseError> {
+	pub async fn from<R: types::AsyncReader>(&mut self, stream: &mut R) -> Option<ParseError> {
 		if self.buf.is_none() {
 			let mut buf = BytesMut::with_capacity(MESSAGE_BUFFER_SIZE);
 			unsafe {

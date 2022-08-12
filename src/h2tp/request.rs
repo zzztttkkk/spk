@@ -1,7 +1,6 @@
 use std::fmt;
 use bytes::BytesMut;
-use tokio::net::tcp::ReadHalf;
-use crate::h2tp::headers;
+use crate::h2tp::{headers, types};
 use crate::h2tp::headers::Headers;
 use crate::h2tp::message::{Message, ParseError};
 use crate::h2tp::url::Url;
@@ -64,7 +63,7 @@ impl Request {
 		self.msg.clear();
 	}
 
-	pub async fn from<'sl>(&mut self, stream: &mut ReadHalf<'sl>) -> Option<ParseError> {
+	pub async fn from<R: types::AsyncReader>(&mut self, stream: &mut R) -> Option<ParseError> {
 		return self.msg.from(stream).await;
 	}
 
