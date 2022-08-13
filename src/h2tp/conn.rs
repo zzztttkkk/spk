@@ -3,6 +3,7 @@ use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool};
 use tokio::io::{AsyncWriteExt};
 use crate::h2tp::cfg::ATOMIC_ORDERING;
+use crate::h2tp::handler::Handler;
 use crate::h2tp::request::Request;
 use crate::h2tp::types::{AsyncReader, AsyncWriter};
 
@@ -18,8 +19,8 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 		return Self { addr, r, w, server_is_closing };
 	}
 
-	pub async fn handle(&mut self) {
-		let mut req = Request::new();
+	pub async fn as_server(&mut self) {
+		let mut req = Box::new(Request::new());
 		loop {
 			match req.from(&mut self.r).await {
 				Some(_) => {

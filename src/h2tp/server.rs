@@ -1,13 +1,11 @@
 use core::fmt;
 use std::fs::File;
-use std::future::Future;
 use std::io::BufReader;
 use std::path::{Path};
 use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::time::Duration;
-use tokio::io::AsyncWriteExt;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::{TcpListener};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
@@ -15,7 +13,7 @@ use tokio_rustls::{rustls, TlsAcceptor};
 use tokio_rustls::rustls::{Certificate, PrivateKey};
 use crate::h2tp::conn::Conn;
 use crate::h2tp::cfg::ATOMIC_ORDERING;
-
+use crate::h2tp::handler::Handler;
 
 struct Tls {
 	cert: String,
@@ -53,6 +51,7 @@ pub struct Server {
 	shutdown_signal_receiver: UnboundedReceiver<()>,
 	shutdown_done_sender: UnboundedSender<()>,
 	shutdownhandler: Arc<Mutex<ShutdownHandler>>,
+	handler: Option<Box<dyn Handler + Send>>,
 }
 
 pub struct ShutdownHandler {
@@ -84,15 +83,17 @@ pub trait PrintableToSocketAddrs: tokio::net::ToSocketAddrs + fmt::Display + Cop
 impl<T> PrintableToSocketAddrs for T where T: tokio::net::ToSocketAddrs + fmt::Display + Copy {}
 
 impl Server {
-	pub fn new() -> Self {
+	pub fn new(handler: Option<Box<dyn Handler + Send>>) -> Self {
 		let (stx, srx) = unbounded_channel();
 		let (dtx, drx) = unbounded_channel();
+
 		return Self {
 			listener: None,
 			tls: None,
 			shutdown_signal_receiver: srx,
 			shutdown_done_sender: dtx,
 			shutdownhandler: Arc::new(Mutex::new(ShutdownHandler { signal_sender: stx, done_receiver: drx })),
+			handler,
 		};
 	}
 
@@ -146,7 +147,7 @@ impl Server {
 												// https://github.com/tokio-rs/tokio/issues/1108
 												let (r, w) = tokio::io::split(tls_stream);
 												let mut conn = Conn::new(addr, r, w, Some(cc));
-												conn.handle().await;
+												conn.as_server().await;
 												accc.fetch_sub(1, ATOMIC_ORDERING);
 											}
 											Err(_) => {}
@@ -158,7 +159,7 @@ impl Server {
 										accc.fetch_add(1, ATOMIC_ORDERING);
 										let (r, w) = stream.split();
 										let mut conn = Conn::new(addr, r, w, Some(cc));
-										conn.handle().await;
+										conn.as_server().await;
 										accc.fetch_sub(1, ATOMIC_ORDERING);
 									});
 								}

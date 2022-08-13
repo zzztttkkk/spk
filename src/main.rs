@@ -7,8 +7,12 @@ mod json;
 
 #[tokio::main]
 async fn main() {
-	let mut server = h2tp::server();
-	server.tls("./dist/spk.local.pem", "./dist/spk.local-key.pem");
+	let mut server = h2tp::server(
+		Some(func!(_, _, async move {
+			return Ok(());
+		})));
+
+	// server.tls("./dist/spk.local.pem", "./dist/spk.local-key.pem");
 
 	let shutdownhandler = server.shutdownhandler();
 

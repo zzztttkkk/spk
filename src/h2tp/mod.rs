@@ -1,5 +1,6 @@
 use std::sync::{Arc};
 use tokio::sync::Mutex;
+use crate::h2tp::handler::Handler;
 
 mod server;
 mod conn;
@@ -15,7 +16,6 @@ mod request;
 mod response;
 mod url;
 mod ctx;
-mod result;
 mod types;
 
 pub async fn shutdown(handler: &Arc<Mutex<server::ShutdownHandler>>, timout: u64) {
@@ -27,7 +27,47 @@ pub async fn shutdown(handler: &Arc<Mutex<server::ShutdownHandler>>, timout: u64
 	}
 }
 
-pub fn server() -> server::Server {
-	return server::Server::new();
+pub fn server(handler: Option<Box<dyn Handler + Send>>) -> server::Server {
+	return server::Server::new(handler);
 }
 
+pub type FuncHandler = handler::FuncHandler;
+
+#[macro_export]
+macro_rules! func {
+    ($content:expr) => {
+		Box::new(
+			h2tp::FuncHandler::new(|_, _|{
+				return Box::new($content);
+			})
+		)
+	};
+ 	(_, _, $content:expr) => {
+		Box::new(
+			h2tp::FuncHandler::new(|_, _|{
+				return Box::new($content);
+			})
+		)
+	};
+	($req:ident, _, $content:expr) => {
+		Box::new(
+			h2tp::FuncHandler::new(|$req, _|{
+				return Box::new($content);
+			})
+		)
+	};
+	(_, $resp:ident,  $content:expr) => {
+		Box::new(
+			h2tp::FuncHandler::new(|_, $resp|{
+				return Box::new($content);
+			})
+		)
+	};
+	($req:ident, $resp:ident,  $content:expr) => {
+		Box::new(
+			h2tp::FuncHandler::new(|$req, $resp|{
+				return Box::new($content);
+			})
+		)
+	};
+}
