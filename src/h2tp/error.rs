@@ -1,3 +1,5 @@
+use core::fmt;
+use std::fmt::Formatter;
 use crate::h2tp::status_code::StatusCode;
 
 pub struct Error {
@@ -34,5 +36,11 @@ impl Error {
 				self.msgref
 			}
 		};
+	}
+}
+
+impl fmt::Debug for Error {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "HttpError({:?}, {})", self.code, self.msg())
 	}
 }

@@ -1,14 +1,12 @@
 #![allow(dead_code)]
 
-extern crate core;
-
 mod h2tp;
 mod json;
 
 #[tokio::main]
 async fn main() {
 	let mut server = h2tp::server(
-		Some(func!(_, _, async move {
+		Some(func!(req, _, async move {
 			return Ok(());
 		})));
 

@@ -1,5 +1,8 @@
 // generate by "gen/gen_status_code.py"
 
+use std::fmt;
+use std::fmt::Formatter;
+
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone)]
 pub enum StatusCode {
 	Continue = 100,
@@ -130,5 +133,11 @@ impl StatusCode {
 			StatusCode::NotExtended => "Not Extended",
 			StatusCode::NetworkAuthenticationRequired => "Network Authentication Required",
 		}
+	}
+}
+
+impl fmt::Debug for StatusCode {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "StatusCode({} {})", unsafe { *(self as *const StatusCode as *const i32) }, self.msg())
 	}
 }

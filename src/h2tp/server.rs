@@ -9,10 +9,11 @@ use tokio::net::{TcpListener};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
-use tokio_rustls::{rustls, TlsAcceptor};
-use tokio_rustls::rustls::{Certificate, PrivateKey};
+use tokio_rustls::{TlsAcceptor};
+use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 use crate::h2tp::conn::Conn;
 use crate::h2tp::cfg::ATOMIC_ORDERING;
+use crate::h2tp::FuncHandler;
 use crate::h2tp::handler::Handler;
 
 struct Tls {
@@ -21,7 +22,7 @@ struct Tls {
 }
 
 impl Tls {
-	pub fn load(&self) -> (Vec<Certificate>, Vec<PrivateKey>) {
+	pub fn load(&self) -> ServerConfig {
 		let mut certs = Vec::new();
 		for e in rustls_pemfile::certs(
 			&mut BufReader::new(File::open(Path::new(self.cert.as_str())).unwrap())
@@ -41,7 +42,10 @@ impl Tls {
 				keys.push(PrivateKey(e));
 			}
 		}
-		return (certs, keys);
+		return ServerConfig::builder()
+			.with_safe_defaults()
+			.with_no_client_auth()
+			.with_single_cert(certs, keys.remove(0)).unwrap();
 	}
 }
 
@@ -51,8 +55,9 @@ pub struct Server {
 	shutdown_signal_receiver: UnboundedReceiver<()>,
 	shutdown_done_sender: UnboundedSender<()>,
 	shutdownhandler: Arc<Mutex<ShutdownHandler>>,
-	handler: Option<Box<dyn Handler + Send>>,
+	handler: Box<dyn Handler + Send>,
 }
+
 
 pub struct ShutdownHandler {
 	signal_sender: UnboundedSender<()>,
@@ -87,13 +92,27 @@ impl Server {
 		let (stx, srx) = unbounded_channel();
 		let (dtx, drx) = unbounded_channel();
 
+		let arc_handler: Box<dyn Handler + Send>;
+		match handler {
+			Some(v) => {
+				arc_handler = v;
+			}
+			None => {
+				arc_handler = Box::new(FuncHandler::new(|_, _| {
+					return Box::new(async {
+						return Ok(());
+					});
+				}));
+			}
+		}
+
 		return Self {
 			listener: None,
 			tls: None,
 			shutdown_signal_receiver: srx,
 			shutdown_done_sender: dtx,
 			shutdownhandler: Arc::new(Mutex::new(ShutdownHandler { signal_sender: stx, done_receiver: drx })),
-			handler,
+			handler: arc_handler,
 		};
 	}
 
@@ -111,11 +130,7 @@ impl Server {
 		let mut tls_acceptor: Option<TlsAcceptor> = None;
 		match self.tls.as_ref() {
 			Some(tls) => {
-				let (certs, mut keys) = tls.load();
-				let tls_cfg = rustls::ServerConfig::builder()
-					.with_safe_defaults()
-					.with_no_client_auth()
-					.with_single_cert(certs, keys.remove(0)).unwrap();
+				let tls_cfg = tls.load();
 				tls_acceptor = Some(tokio_rustls::TlsAcceptor::from(Arc::new(tls_cfg)));
 				println!("TLS OK");
 			}
