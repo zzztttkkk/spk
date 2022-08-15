@@ -1,7 +1,4 @@
-use std::borrow::{Borrow, BorrowMut};
-use std::cell::RefCell;
 use std::net::SocketAddr;
-use std::rc::Rc;
 use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool};
 use tokio::io::{AsyncWriteExt};
@@ -32,7 +29,7 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 			{
 				let mut g = req.lock().await;
 				let req = &mut (*g);
-				match req.borrow_mut().from(&mut self.r).await {
+				match req.from(&mut self.r).await {
 					Some(_) => {
 						break;
 					}
