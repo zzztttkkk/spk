@@ -14,11 +14,11 @@ pub struct Conn<R: AsyncReader, W: AsyncWriter> {
 	addr: SocketAddr,
 	r: R,
 	w: W,
-	server_is_closing: Option<Arc<AtomicBool>>,
+	server_is_closing: Arc<AtomicBool>,
 }
 
 impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
-	pub fn new(addr: SocketAddr, r: R, w: W, server_is_closing: Option<Arc<AtomicBool>>) -> Self {
+	pub fn new(addr: SocketAddr, r: R, w: W, server_is_closing: Arc<AtomicBool>) -> Self {
 		return Self { addr, r, w, server_is_closing };
 	}
 
@@ -40,15 +40,9 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 
 			(handler.handle(req.clone(), resp.clone()).await).err();
 
-			match &self.server_is_closing {
-				Some(closing) => {
-					if closing.load(ATOMIC_ORDERING) {
-						return;
-					}
-				}
-				None => {}
+			if self.server_is_closing.load(ATOMIC_ORDERING) {
+				return;
 			}
-
 
 			self.w.write(b"HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nHello World").await.err();
 

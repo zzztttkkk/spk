@@ -162,7 +162,7 @@ impl Server {
 												// https://github.com/rustls/rustls/issues/288
 												// https://github.com/tokio-rs/tokio/issues/1108
 												let (r, w) = tokio::io::split(tls_stream);
-												let mut conn = Conn::new(addr, r, w, Some(cc));
+												let mut conn = Conn::new(addr, r, w, cc);
 												conn.as_server(hc).await;
 												accc.fetch_sub(1, ATOMIC_ORDERING);
 											}
@@ -174,7 +174,7 @@ impl Server {
 									tokio::spawn(async move {
 										accc.fetch_add(1, ATOMIC_ORDERING);
 										let (r, w) = stream.split();
-										let mut conn = Conn::new(addr, r, w, Some(cc));
+										let mut conn = Conn::new(addr, r, w, cc);
 										conn.as_server(hc).await;
 										accc.fetch_sub(1, ATOMIC_ORDERING);
 									});
