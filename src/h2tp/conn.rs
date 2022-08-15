@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool};
 use tokio::io::{AsyncWriteExt};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use crate::h2tp::cfg::ATOMIC_ORDERING;
 use crate::h2tp::handler::Handler;
 use crate::h2tp::request::Request;
@@ -22,12 +22,12 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 	}
 
 	pub async fn as_server(&mut self, handler: Arc<Box<dyn Handler + Send + Sync>>) {
-		let req = Arc::new(Mutex::new(Request::new()));
-		let resp = Arc::new(Mutex::new(Response::new()));
+		let req = Arc::new(RwLock::new(Request::new()));
+		let resp = Arc::new(RwLock::new(Response::new()));
 
 		loop {
 			{
-				let mut g = req.lock().await;
+				let mut g = req.write().await;
 				let req = &mut (*g);
 				match req.from(&mut self.r).await {
 					Some(_) => {
@@ -52,7 +52,7 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 			self.w.write(b"HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nHello World").await.err();
 
 			{
-				let mut g = req.lock().await;
+				let mut g = req.write().await;
 				let req = &mut (*g);
 				req.clear();
 			}

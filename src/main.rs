@@ -8,8 +8,7 @@ async fn main() {
 	let mut server = h2tp::server(Some(
 		Box::new(h2tp::FuncHandler::new(|req, _| {
 			return Box::pin(async move {
-				let mut g = req.lock().await;
-				let req = &mut (*g);
+				let req = req.read().await;
 				println!("{:?}", req);
 				return Ok(());
 			});
