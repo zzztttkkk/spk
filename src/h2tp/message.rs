@@ -88,7 +88,7 @@ impl fmt::Debug for ParseError {
 	}
 }
 
-const BAD_REQUEST: &'static str = "bad request";
+const BAD_REQUEST: &str = "bad request";
 
 impl Message {
 	pub fn new() -> Self {
@@ -414,16 +414,12 @@ impl Message {
 								status = ParseStatus::HeadersOK;
 								continue;
 							}
+						} else if hkvsep {
+							hval.push(c as char);
+						} else if c == b':' {
+							hkvsep = true;
 						} else {
-							if hkvsep {
-								hval.push(c as char);
-							} else {
-								if c == b':' {
-									hkvsep = true;
-								} else {
-									hkey.push(c as char);
-								}
-							}
+							hkey.push(c as char);
 						}
 					}
 					_ => {

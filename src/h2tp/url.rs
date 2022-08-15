@@ -102,7 +102,7 @@ impl<'a> fmt::Debug for Url<'a> {
 	}
 }
 
-const PATH_MISSING: &'static str = "Path Missing";
+const PATH_MISSING: &str = "Path Missing";
 
 macro_rules! getter {
     ($field:ident, $idx:expr) => {

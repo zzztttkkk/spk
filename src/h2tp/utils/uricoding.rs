@@ -16,9 +16,9 @@ pub fn encode_uri(dist: &mut String, src: &str) {
 	}
 }
 
-pub fn encode_uri_component(dist: &mut str, src: &str) {}
+pub fn encode_uri_component(_dist: &mut str, _src: &str) {}
 
-pub fn decode_uri(dist: &mut str, src: &str) {}
+pub fn decode_uri(_dist: &mut str, _src: &str) {}
 
 #[cfg(test)]
 mod tests {
