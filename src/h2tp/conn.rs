@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::net::SocketAddr;
 use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool};
@@ -22,13 +23,12 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 	}
 
 	pub async fn as_server(&mut self, handler: Arc<Box<dyn Handler + Send + Sync>>) {
-		let req = Arc::new(Mutex::new(Request::new()));
-		let resp = Arc::new(Mutex::new(Response::new()));
+		let req = Arc::new(RefCell::new(Request::new()));
+		let resp = Arc::new(RefCell::new(Response::new()));
 
 		loop {
 			{
-				let mut g = req.lock().await;
-				let req = &mut (*g);
+				let mut req = req.borrow_mut();
 				match req.from(&mut self.r).await {
 					Some(_) => {
 						break;
@@ -52,8 +52,7 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 			self.w.write(b"HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nHello World").await.err();
 
 			{
-				let mut g = req.lock().await;
-				let req = &mut (*g);
+				let mut req = req.borrow_mut();
 				req.clear();
 			}
 		}

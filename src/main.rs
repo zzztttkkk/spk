@@ -6,14 +6,14 @@ mod json;
 #[tokio::main]
 async fn main() {
 	let mut server = h2tp::server(Some(
-		Box::new(h2tp::FuncHandler::new(|req, _| {
-			return Box::pin(async move {
-				let mut g = req.lock().await;
-				let req = &mut (*g);
-				println!("{:?}", req);
-				return Ok(());
-			});
-		}))
+		Box::new(
+			h2tp::FuncHandler::new(|req, _| {
+				return Box::pin(async move {
+					println!("{:?}", req);
+					return Ok(());
+				});
+			})
+		)
 	));
 
 	// server.tls("./dist/spk.local.pem", "./dist/spk.local-key.pem");

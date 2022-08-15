@@ -1,14 +1,14 @@
+use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc};
-use tokio::sync::Mutex;
 use crate::h2tp::error::Error;
 use crate::h2tp::request::Request;
 use crate::h2tp::response::Response;
 
 type BoxedFuture = Pin<Box<dyn Future<Output=Result<(), Error>> + Send>>;
-type Req = Arc<Mutex<Request>>;
-type Resp = Arc<Mutex<Response>>;
+type Req = Arc<RefCell<Request>>;
+type Resp = Arc<RefCell<Response>>;
 type FuncType = fn(req: Req, resp: Resp) -> BoxedFuture;
 
 pub trait Handler {

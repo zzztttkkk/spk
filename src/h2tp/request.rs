@@ -45,9 +45,9 @@ impl<'req> Builder<'req> {
 
 impl fmt::Debug for Request {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "Request <{} {} {} @ {:#x}>",
+		write!(f, "Request <{} {} {} @ {:p}>",
 			   self.method(), self.path(), self.version(),
-			   (self as *const Request as u64),
+			   self,
 		)
 	}
 }

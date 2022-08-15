@@ -49,24 +49,115 @@ macro_rules! func {
 			})
 		)
 	};
+	(mut $req:ident, _, $content:expr) => {
+		Box::new(
+			h2tp::FuncHandler::new(|__req_arc_mutex, _|{
+				return Box::pin(async move {
+					let mut __req_arc_mutex_guard = __req_arc_mutex.lock().await;
+					let mut $req = &mut (*__req_arc_mutex_guard);
+					{
+						$content
+					}
+				});
+			})
+		)
+	};
+	(mut $req:ident, $resp:ident, $content:expr) => {
+		Box::new(
+			h2tp::FuncHandler::new(|__req_arc_mutex, _|{
+				return Box::pin(async move {
+					let mut __req_arc_mutex_guard = __req_arc_mutex.lock().await;
+					let mut $req = &mut (*__req_arc_mutex_guard);
+					let __resp_arc_mutex_guard = __resp_arc_mutex.lock().await;
+					let $resp = &(*__resp_arc_mutex_guard);
+					{
+						$content
+					}
+				});
+			})
+		)
+	};
 	($req:ident, _, $content:expr) => {
 		Box::new(
-			h2tp::FuncHandler::new(|$req, _|{
-				return Box::pin($content);
+			h2tp::FuncHandler::new(|__req_arc_mutex, _|{
+				return Box::pin(async move {
+					let __req_arc_mutex_guard = __req_arc_mutex.lock().await;
+					let $req = &(*__req_arc_mutex_guard);
+					{
+						$content
+					}
+				});
 			})
 		)
 	};
-	(_, $resp:ident,  $content:expr) => {
+	(_, mut $resp:ident, $content:expr) => {
 		Box::new(
-			h2tp::FuncHandler::new(|_, $resp|{
-				return Box::pin($content);
+			h2tp::FuncHandler::new(|_, __resp_arc_mutex|{
+				return Box::pin(async move {
+					let mut __resp_arc_mutex_guard = __resp_arc_mutex.lock().await;
+					let mut $resp = &mut (*__resp_arc_mutex_guard);
+					{
+						$content
+					}
+				});
 			})
 		)
 	};
-	($req:ident, $resp:ident,  $content:expr) => {
+	($req:ident, mut $resp:ident, $content:expr) => {
 		Box::new(
-			h2tp::FuncHandler::new(|$req, $resp|{
-				return Box::pin($content);
+			h2tp::FuncHandler::new(|_, __resp_arc_mutex|{
+				return Box::pin(async move {
+					let __req_arc_mutex_guard = __req_arc_mutex.lock().await;
+					let $req = &(*__req_arc_mutex_guard);
+					let mut __resp_arc_mutex_guard = __resp_arc_mutex.lock().await;
+					let mut $resp = &mut (*__resp_arc_mutex_guard);
+					{
+						$content
+					}
+				});
+			})
+		)
+	};
+	(_, $resp:ident, $content:expr) => {
+		Box::new(
+			h2tp::FuncHandler::new(|_, __resp_arc_mutex|{
+				return Box::pin(async move {
+					let __resp_arc_mutex_guard = __resp_arc_mutex.lock().await;
+					let $resp = &(*__resp_arc_mutex_guard);
+					{
+						$content
+					}
+				});
+			})
+		)
+	};
+	($req:ident, $resp:ident, $content:expr) => {
+		Box::new(
+			h2tp::FuncHandler::new(|__req_arc_mutex, __resp_arc_mutex|{
+				return Box::pin(async move {
+					let __req_arc_mutex_guard = __req_arc_mutex.lock().await;
+					let $req = &(*__req_arc_mutex_guard);
+					let __resp_arc_mutex_guard = __resp_arc_mutex.lock().await;
+					let $resp = &(*__resp_arc_mutex_guard);
+					{
+						$content
+					}
+				});
+			})
+		)
+	};
+	(mut $req:ident, mut $resp:ident, $content:expr) => {
+		Box::new(
+			h2tp::FuncHandler::new(|__req_arc_mutex, __resp_arc_mutex|{
+				return Box::pin(async move {
+					let mut __req_arc_mutex_guard = __req_arc_mutex.lock().await;
+					let $req = &mut (*__req_arc_mutex_guard);
+					let mut __resp_arc_mutex_guard = __resp_arc_mutex.lock().await;
+					let $resp = &mut (*__resp_arc_mutex_guard);
+					{
+						$content
+					}
+				});
 			})
 		)
 	};
