@@ -88,17 +88,17 @@ pub trait PrintableToSocketAddrs: tokio::net::ToSocketAddrs + fmt::Display + Cop
 impl<T> PrintableToSocketAddrs for T where T: tokio::net::ToSocketAddrs + fmt::Display + Copy {}
 
 impl Server {
-	pub fn new(handler: Option<Box<dyn Handler + Send + Sync>>) -> Self {
+	pub fn new(h: Option<Box<dyn Handler + Send + Sync>>) -> Self {
 		let (stx, srx) = unbounded_channel();
 		let (dtx, drx) = unbounded_channel();
 
-		let arc_handler: Arc<Box<dyn Handler + Send + Sync>>;
-		match handler {
+		let handler: Arc<Box<dyn Handler + Send + Sync>>;
+		match h {
 			Some(v) => {
-				arc_handler = Arc::new(v);
+				handler = Arc::new(v);
 			}
 			None => {
-				arc_handler = Arc::new(Box::new(FuncHandler::new(|_, _| {
+				handler = Arc::new(Box::new(FuncHandler::new(|_, _| {
 					return Box::pin(async {
 						return Ok(());
 					});
@@ -112,7 +112,7 @@ impl Server {
 			shutdown_signal_receiver: srx,
 			shutdown_done_sender: dtx,
 			shutdownhandler: Arc::new(Mutex::new(ShutdownHandler { signal_sender: stx, done_receiver: drx })),
-			handler: arc_handler,
+			handler,
 		};
 	}
 
