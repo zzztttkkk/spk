@@ -1,9 +1,8 @@
-use std::cell::RefCell;
 use std::net::SocketAddr;
 use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool};
 use tokio::io::{AsyncWriteExt};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{RwLock};
 use crate::h2tp::cfg::ATOMIC_ORDERING;
 use crate::h2tp::handler::Handler;
 use crate::h2tp::request::Request;
