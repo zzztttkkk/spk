@@ -1,13 +1,19 @@
+use std::cell::{RefMut};
 use std::future::Future;
+use std::pin::Pin;
+use std::sync::{Arc};
+use tokio::sync::Mutex;
 use crate::h2tp::error::Error;
 use crate::h2tp::request::Request;
 use crate::h2tp::response::Response;
 
-type BoxedFuture = Box<dyn Future<Output=Result<(), Error>> + Send>;
-type FuncType = fn(Box<Request>, Box<Response>) -> BoxedFuture;
+type BoxedFuture = Pin<Box<dyn Future<Output=Result<(), Error>> + Send>>;
+type Req = Arc<Mutex<Request>>;
+type Resp = Arc<Mutex<Response>>;
+type FuncType = fn(req: Req, resp: Resp) -> BoxedFuture;
 
 pub trait Handler {
-	fn handle(&self, req: Box<Request>, resp: Box<Response>) -> BoxedFuture;
+	fn handle(&self, req: Req, resp: Resp) -> BoxedFuture;
 }
 
 pub struct FuncHandler {
@@ -23,7 +29,7 @@ impl FuncHandler {
 
 impl Handler for FuncHandler {
 	#[inline]
-	fn handle(&self, req: Box<Request>, resp: Box<Response>) -> BoxedFuture {
+	fn handle(&self, req: Req, resp: Resp) -> BoxedFuture {
 		(self.f)(req, resp)
 	}
 }

@@ -55,7 +55,7 @@ pub struct Server {
 	shutdown_signal_receiver: UnboundedReceiver<()>,
 	shutdown_done_sender: UnboundedSender<()>,
 	shutdownhandler: Arc<Mutex<ShutdownHandler>>,
-	handler: Box<dyn Handler + Send>,
+	handler: Arc<Box<dyn Handler + Send + Sync>>,
 }
 
 
@@ -88,21 +88,21 @@ pub trait PrintableToSocketAddrs: tokio::net::ToSocketAddrs + fmt::Display + Cop
 impl<T> PrintableToSocketAddrs for T where T: tokio::net::ToSocketAddrs + fmt::Display + Copy {}
 
 impl Server {
-	pub fn new(handler: Option<Box<dyn Handler + Send>>) -> Self {
+	pub fn new(handler: Option<Box<dyn Handler + Send + Sync>>) -> Self {
 		let (stx, srx) = unbounded_channel();
 		let (dtx, drx) = unbounded_channel();
 
-		let arc_handler: Box<dyn Handler + Send>;
+		let arc_handler: Arc<Box<dyn Handler + Send + Sync>>;
 		match handler {
 			Some(v) => {
-				arc_handler = v;
+				arc_handler = Arc::new(v);
 			}
 			None => {
-				arc_handler = Box::new(FuncHandler::new(|_, _| {
-					return Box::new(async {
+				arc_handler = Arc::new(Box::new(FuncHandler::new(|_, _| {
+					return Box::pin(async {
 						return Ok(());
 					});
-				}));
+				})));
 			}
 		}
 
@@ -150,6 +150,7 @@ impl Server {
 						Ok((mut stream, addr)) => {
 							let accc = Arc::clone(&alive_conn_count);
 							let cc = Arc::clone(&closing);
+							let hc = Arc::clone(&self.handler);
 
 							match tls_acceptor.as_ref() {
 								Some(tls)=>{
@@ -162,7 +163,7 @@ impl Server {
 												// https://github.com/tokio-rs/tokio/issues/1108
 												let (r, w) = tokio::io::split(tls_stream);
 												let mut conn = Conn::new(addr, r, w, Some(cc));
-												conn.as_server().await;
+												conn.as_server(hc).await;
 												accc.fetch_sub(1, ATOMIC_ORDERING);
 											}
 											Err(_) => {}
@@ -174,7 +175,7 @@ impl Server {
 										accc.fetch_add(1, ATOMIC_ORDERING);
 										let (r, w) = stream.split();
 										let mut conn = Conn::new(addr, r, w, Some(cc));
-										conn.as_server().await;
+										conn.as_server(hc).await;
 										accc.fetch_sub(1, ATOMIC_ORDERING);
 									});
 								}

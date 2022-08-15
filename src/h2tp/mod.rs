@@ -27,7 +27,7 @@ pub async fn shutdown(handler: &Arc<Mutex<server::ShutdownHandler>>, timout: u64
 	}
 }
 
-pub fn server(handler: Option<Box<dyn Handler + Send>>) -> server::Server {
+pub fn server(handler: Option<Box<dyn Handler + Send + Sync>>) -> server::Server {
 	return server::Server::new(handler);
 }
 
@@ -38,35 +38,35 @@ macro_rules! func {
     ($content:expr) => {
 		Box::new(
 			h2tp::FuncHandler::new(|_, _|{
-				return Box::new($content);
+				return Box::pin($content);
 			})
 		)
 	};
  	(_, _, $content:expr) => {
 		Box::new(
 			h2tp::FuncHandler::new(|_, _|{
-				return Box::new($content);
+				return Box::pin($content);
 			})
 		)
 	};
 	($req:ident, _, $content:expr) => {
 		Box::new(
 			h2tp::FuncHandler::new(|$req, _|{
-				return Box::new($content);
+				return Box::pin($content);
 			})
 		)
 	};
 	(_, $resp:ident,  $content:expr) => {
 		Box::new(
 			h2tp::FuncHandler::new(|_, $resp|{
-				return Box::new($content);
+				return Box::pin($content);
 			})
 		)
 	};
 	($req:ident, $resp:ident,  $content:expr) => {
 		Box::new(
 			h2tp::FuncHandler::new(|$req, $resp|{
-				return Box::new($content);
+				return Box::pin($content);
 			})
 		)
 	};

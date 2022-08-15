@@ -1,7 +1,11 @@
+use std::borrow::{Borrow, BorrowMut};
+use std::cell::RefCell;
 use std::net::SocketAddr;
+use std::rc::Rc;
 use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool};
 use tokio::io::{AsyncWriteExt};
+use tokio::sync::Mutex;
 use crate::h2tp::cfg::ATOMIC_ORDERING;
 use crate::h2tp::handler::Handler;
 use crate::h2tp::request::Request;
@@ -20,20 +24,23 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 		return Self { addr, r, w, server_is_closing };
 	}
 
-	pub async fn as_server(&mut self) {
-		let mut req = Box::new(Request::new());
+	pub async fn as_server(&mut self, handler: Arc<Box<dyn Handler + Send + Sync>>) {
+		let req = Arc::new(Mutex::new(Request::new()));
+		let resp = Arc::new(Mutex::new(Response::new()));
 
 		loop {
-			match req.from(&mut self.r).await {
-				Some(_) => {
-					break;
+			{
+				let mut g = req.lock().await;
+				let req = &mut (*g);
+				match req.borrow_mut().from(&mut self.r).await {
+					Some(_) => {
+						break;
+					}
+					None => {}
 				}
-				None => {}
 			}
 
-			println!("{:?}", req);
-			println!("{:?}", req.headers());
-			println!("{:?}", req.body());
+			(handler.handle(req.clone(), resp.clone()).await).err();
 
 			match &self.server_is_closing {
 				Some(closing) => {
@@ -47,7 +54,11 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 
 			self.w.write(b"HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nHello World").await.err();
 
-			req.clear();
+			{
+				let mut g = req.lock().await;
+				let req = &mut (*g);
+				req.clear();
+			}
 		}
 	}
 }
