@@ -55,7 +55,6 @@ pub struct Server {
 	shutdown_signal_receiver: UnboundedReceiver<()>,
 	shutdown_done_sender: UnboundedSender<()>,
 	shutdownhandler: Arc<Mutex<ShutdownHandler>>,
-	handler: Arc<Box<dyn Handler + Send + Sync>>,
 }
 
 
@@ -88,23 +87,9 @@ pub trait PrintableToSocketAddrs: tokio::net::ToSocketAddrs + fmt::Display + Cop
 impl<T> PrintableToSocketAddrs for T where T: tokio::net::ToSocketAddrs + fmt::Display + Copy {}
 
 impl Server {
-	pub fn new(h: Option<Box<dyn Handler + Send + Sync>>) -> Self {
+	pub fn new() -> Self {
 		let (stx, srx) = unbounded_channel();
 		let (dtx, drx) = unbounded_channel();
-
-		let handler: Arc<Box<dyn Handler + Send + Sync>>;
-		match h {
-			Some(v) => {
-				handler = Arc::new(v);
-			}
-			None => {
-				handler = Arc::new(Box::new(FuncHandler::new(|_, _| {
-					return Box::pin(async {
-						return Ok(());
-					});
-				})));
-			}
-		}
 
 		return Self {
 			listener: None,
@@ -112,7 +97,6 @@ impl Server {
 			shutdown_signal_receiver: srx,
 			shutdown_done_sender: dtx,
 			shutdownhandler: Arc::new(Mutex::new(ShutdownHandler { signal_sender: stx, done_receiver: drx })),
-			handler,
 		};
 	}
 
@@ -124,7 +108,7 @@ impl Server {
 		return self.shutdownhandler.clone();
 	}
 
-	pub async fn listen<Addr: PrintableToSocketAddrs>(&mut self, addr: Addr) {
+	pub async fn listen<'a, Addr: PrintableToSocketAddrs>(&mut self, addr: Addr, h: Option<Box<dyn Handler<'a> + Send + Sync>>) {
 		self.listener = Some(TcpListener::bind(addr).await.unwrap());
 
 		let mut tls_acceptor: Option<TlsAcceptor> = None;
@@ -143,6 +127,20 @@ impl Server {
 		let closing = Arc::new(AtomicBool::new(false));
 		let lref = self.listener.as_ref().unwrap();
 
+		let handler: Arc<Box<dyn Handler<'a> + Send + Sync>>;
+		match h {
+			Some(v) => {
+				handler = Arc::new(v);
+			}
+			None => {
+				handler = Arc::new(Box::new(FuncHandler::new(|_, _| {
+					return Box::pin(async {
+						return Ok(());
+					});
+				})));
+			}
+		}
+
 		loop {
 			tokio::select! {
 				result = lref.accept() => {
@@ -150,7 +148,7 @@ impl Server {
 						Ok((mut stream, addr)) => {
 							let accc = Arc::clone(&alive_conn_count);
 							let cc = Arc::clone(&closing);
-							let hc = Arc::clone(&self.handler);
+							let hc = Arc::clone(&handler);
 
 							match tls_acceptor.as_ref() {
 								Some(tls)=>{

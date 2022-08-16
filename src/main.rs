@@ -5,22 +5,14 @@ mod json;
 
 #[tokio::main]
 async fn main() {
-	let mut server = h2tp::server(Some(
-		Box::new(h2tp::FuncHandler::new(|req, _| {
-			return Box::pin(async move {
-				let req = req.read().await;
-				println!("{:?}", req);
-				return Ok(());
-			});
-		}))
-	));
+	let mut server = h2tp::server();
 
 	// server.tls("./dist/spk.local.pem", "./dist/spk.local-key.pem");
 
 	let shutdownhandler = server.shutdownhandler();
 
 	tokio::spawn(async move {
-		server.listen("127.0.0.1:8080").await;
+		server.listen("127.0.0.1:8080", None).await;
 	});
 
 	match tokio::signal::ctrl_c().await {

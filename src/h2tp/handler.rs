@@ -7,28 +7,26 @@ use crate::h2tp::request::Request;
 use crate::h2tp::response::Response;
 
 type BoxedFuture = Pin<Box<dyn Future<Output=Result<(), Error>> + Send>>;
-type Req = Arc<RwLock<Request>>;
-type Resp = Arc<RwLock<Response>>;
-type FuncType = fn(req: Req, resp: Resp) -> BoxedFuture;
+type FuncType<'a> = fn(req: &'a mut Request, resp: &'a mut Response) -> BoxedFuture;
 
-pub trait Handler {
-	fn handle(&self, req: Req, resp: Resp) -> BoxedFuture;
+pub trait Handler<'a> {
+	fn handle(&self, req: &'a mut Request, resp: &'a mut Response) -> BoxedFuture;
 }
 
-pub struct FuncHandler {
-	f: FuncType,
+pub struct FuncHandler<'a> {
+	f: FuncType<'a>,
 }
 
-impl FuncHandler {
+impl<'a> FuncHandler<'a> {
 	#[inline]
 	pub fn new(f: FuncType) -> Self {
 		return Self { f };
 	}
 }
 
-impl Handler for FuncHandler {
+impl<'a> Handler<'a> for FuncHandler<'a> {
 	#[inline]
-	fn handle(&self, req: Req, resp: Resp) -> BoxedFuture {
+	fn handle(&self, req: &'a mut Request, resp: &'a mut Response) -> BoxedFuture {
 		(self.f)(req, resp)
 	}
 }

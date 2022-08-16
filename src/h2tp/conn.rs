@@ -21,23 +21,14 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 		return Self { addr, r, w, server_is_closing };
 	}
 
-	pub async fn as_server(&mut self, handler: Arc<Box<dyn Handler + Send + Sync>>) {
-		let req = Arc::new(RwLock::new(Request::new()));
-		let resp = Arc::new(RwLock::new(Response::new()));
-
+	pub async fn as_server<'a>(&mut self, handler: Arc<Box<dyn Handler<'a> + Send + Sync>>) {
 		loop {
-			{
-				let mut g = req.write().await;
-				let req = &mut (*g);
-				match req.from(&mut self.r).await {
-					Some(_) => {
-						break;
-					}
-					None => {}
-				}
-			}
+			let mut req = Request::new();
+			let mut resp = Response::new();
 
-			(handler.handle(req.clone(), resp.clone()).await).err();
+			(req.from(&mut self.r).await).unwrap();
+
+			(handler.handle(&mut req, &mut resp).await).err();
 
 			if self.server_is_closing.load(ATOMIC_ORDERING) {
 				return;
@@ -45,11 +36,7 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 
 			self.w.write(b"HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nHello World").await.err();
 
-			{
-				let mut g = req.write().await;
-				let req = &mut (*g);
-				req.clear();
-			}
+			// req.clear();
 		}
 	}
 }

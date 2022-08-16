@@ -1,6 +1,5 @@
 use std::sync::{Arc};
 use tokio::sync::Mutex;
-use crate::h2tp::handler::Handler;
 
 mod server;
 mod conn;
@@ -27,11 +26,11 @@ pub async fn shutdown(handler: &Arc<Mutex<server::ShutdownHandler>>, timout: u64
 	}
 }
 
-pub fn server(handler: Option<Box<dyn Handler + Send + Sync>>) -> server::Server {
-	return server::Server::new(handler);
+pub fn server() -> server::Server {
+	return server::Server::new();
 }
 
-pub type FuncHandler = handler::FuncHandler;
+pub type FuncHandler<'a> = handler::FuncHandler<'a>;
 
 #[macro_export]
 macro_rules! func {
