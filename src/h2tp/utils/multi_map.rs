@@ -20,7 +20,9 @@ impl AryMap {
 	}
 
 	fn idx(&self, k: &str) -> Option<usize> {
-		return self.keys.iter().position(|e| { return e == k; });
+		return self.keys.iter().position(|e| {
+			return e == k;
+		});
 	}
 
 	fn append(&mut self, k: &str, v: &str) {
@@ -64,12 +66,8 @@ impl AryMap {
 
 	fn get(&self, k: &str) -> Option<&Vec<String>> {
 		match self.idx(k) {
-			Some(idx) => {
-				Some(&self.vals[idx])
-			}
-			None => {
-				None
-			}
+			Some(idx) => Some(&self.vals[idx]),
+			None => None,
 		}
 	}
 }
@@ -129,14 +127,12 @@ impl MultiMap {
 			Some(mapref) => {
 				mapref.clear();
 			}
-			None => {
-				match self.ary.as_mut() {
-					Some(aryref) => {
-						aryref.clear();
-					}
-					None => {}
+			None => match self.ary.as_mut() {
+				Some(aryref) => {
+					aryref.clear();
 				}
-			}
+				None => {}
+			},
 		}
 	}
 
@@ -145,14 +141,12 @@ impl MultiMap {
 			Some(mapref) => {
 				mapref.remove(k);
 			}
-			None => {
-				match self.ary.as_mut() {
-					Some(aryref) => {
-						aryref.remove(k);
-					}
-					None => {}
+			None => match self.ary.as_mut() {
+				Some(aryref) => {
+					aryref.remove(k);
 				}
-			}
+				None => {}
+			},
 		}
 	}
 
@@ -170,43 +164,29 @@ impl MultiMap {
 					}
 				}
 			}
-			None => {
-				match self.ary.as_mut() {
-					Some(aryref) => {
-						aryref.reset(k, v);
-					}
-					None => {}
+			None => match self.ary.as_mut() {
+				Some(aryref) => {
+					aryref.reset(k, v);
 				}
-			}
+				None => {}
+			},
 		}
 	}
 
 	pub fn get(&self, k: &str) -> Option<&Vec<String>> {
 		return match self.map.as_ref() {
-			Some(mapref) => {
-				mapref.get(k)
-			}
-			None => {
-				match self.ary.as_ref() {
-					Some(aryref) => {
-						aryref.get(k)
-					}
-					None => {
-						None
-					}
-				}
-			}
+			Some(mapref) => mapref.get(k),
+			None => match self.ary.as_ref() {
+				Some(aryref) => aryref.get(k),
+				None => None,
+			},
 		};
 	}
 
 	pub fn getone(&self, k: &str) -> Option<&String> {
 		return match self.get(k) {
-			Some(vals) => {
-				vals.first()
-			}
-			None => {
-				None
-			}
+			Some(vals) => vals.first(),
+			None => None,
 		};
 	}
 
@@ -219,29 +199,27 @@ impl MultiMap {
 					}
 				}
 			}
-			None => {
-				match self.ary.as_ref() {
-					Some(aryref) => {
-						for i in 0..aryref.keys.len() {
-							let k = &aryref.keys[i];
-							let valsref = &aryref.vals[i];
-							for v in valsref.iter() {
-								func(k, v);
-							}
+			None => match self.ary.as_ref() {
+				Some(aryref) => {
+					for i in 0..aryref.keys.len() {
+						let k = &aryref.keys[i];
+						let valsref = &aryref.vals[i];
+						for v in valsref.iter() {
+							func(k, v);
 						}
 					}
-					None => {}
 				}
-			}
+				None => {}
+			},
 		}
 	}
 }
 
 #[cfg(test)]
 mod tests {
+	use crate::h2tp::utils::multi_map::MultiMap;
 	use core::fmt;
 	use std::fmt::Formatter;
-	use crate::h2tp::utils::multi_map::{MultiMap};
 
 	#[test]
 	fn test_mm() {
@@ -268,9 +246,7 @@ mod tests {
 
 	impl Obj {
 		fn new(m: i32) -> Self {
-			return Self {
-				num: m,
-			};
+			return Self { num: m };
 		}
 	}
 
