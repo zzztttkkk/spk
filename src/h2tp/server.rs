@@ -15,6 +15,7 @@ use crate::h2tp::conn::Conn;
 use crate::h2tp::cfg::ATOMIC_ORDERING;
 use crate::h2tp::FuncHandler;
 use crate::h2tp::handler::Handler;
+use crate::h2tp::response::Response;
 
 struct Tls {
 	cert: String,
@@ -108,7 +109,7 @@ impl Server {
 		return self.shutdownhandler.clone();
 	}
 
-	pub async fn listen<'a, Addr: PrintableToSocketAddrs>(&mut self, addr: Addr, h: Option<Box<dyn Handler<'a> + Send + Sync>>) {
+	pub async fn listen<'a, Addr: PrintableToSocketAddrs>(&mut self, addr: Addr, h: Option<Arc<dyn Handler + Send + Sync>>) {
 		self.listener = Some(TcpListener::bind(addr).await.unwrap());
 
 		let mut tls_acceptor: Option<TlsAcceptor> = None;
@@ -127,19 +128,18 @@ impl Server {
 		let closing = Arc::new(AtomicBool::new(false));
 		let lref = self.listener.as_ref().unwrap();
 
-		let handler: Arc<Box<dyn Handler<'a> + Send + Sync>>;
-		match h {
+		let handler = match h {
 			Some(v) => {
-				handler = Arc::new(v);
+				v
 			}
 			None => {
-				handler = Arc::new(Box::new(FuncHandler::new(|_, _| {
-					return Box::pin(async {
-						return Ok(());
-					});
-				})));
+				Arc::new(FuncHandler::new(|_| {
+					Box::pin(async {
+						return Ok(Response::new());
+					})
+				})) as _
 			}
-		}
+		};
 
 		loop {
 			tokio::select! {
