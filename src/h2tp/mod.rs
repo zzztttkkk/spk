@@ -16,7 +16,7 @@ mod response;
 mod url;
 mod ctx;
 mod types;
-mod result;
+mod value;
 
 pub async fn shutdown(handler: &Arc<Mutex<server::ShutdownHandler>>, timout: u64) {
 	let mut guard = handler.lock().await;
@@ -32,6 +32,8 @@ pub fn server() -> server::Server {
 }
 
 pub use handler::FuncHandler;
+pub use request::Request;
+pub use response::Response;
 
 #[macro_export]
 macro_rules! func {

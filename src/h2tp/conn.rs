@@ -21,18 +21,29 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 	}
 
 	pub async fn as_server(&mut self, handler: Arc<dyn Handler + Send + Sync>) {
+		let mut req = Request::new();
+		let mut resp = Response::new();
+
 		loop {
-			let mut req = Request::new();
+			match req.from(&mut self.r).await {
+				Some(e) => {
+					if !e.is_empty() && !e.is_eof() {
+						println!("{e:?}");
+					}
+					break;
+				}
+				None => {}
+			}
 
-			req.from(&mut self.r).await.unwrap();
-
-			let mut resp = handler.handle(req).await.unwrap();
+			handler.handle(&mut req, &mut resp).await.unwrap();
 
 			if self.server_is_closing.load(ATOMIC_ORDERING) {
 				return;
 			}
 
 			self.w.write(b"HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nHello World").await.err();
+
+			req.clear();
 		}
 	}
 }

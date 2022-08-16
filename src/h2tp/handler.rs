@@ -3,12 +3,13 @@ use std::pin::Pin;
 use crate::h2tp::error::Error;
 use crate::h2tp::request::Request;
 use crate::h2tp::response::Response;
+use crate::h2tp::value::Value;
 
-type BoxedFuture = Pin<Box<dyn Future<Output=Result<Response, Error>> + Send>>;
-type FuncType = fn(req: Request) -> BoxedFuture;
+type BoxedFuture<'a> = Pin<Box<dyn Future<Output=Result<Option<Box<dyn Value>>, Error>> + Send + 'a>>;
+type FuncType = for<'a> fn(req: &'a mut Request, resp: &'a mut Response) -> BoxedFuture<'a>;
 
 pub trait Handler {
-	fn handle(&self, req: Request) -> BoxedFuture;
+	fn handle<'a>(&self, req: &'a mut Request, resp: &'a mut Response) -> BoxedFuture<'a>;
 }
 
 pub struct FuncHandler {
@@ -24,8 +25,8 @@ impl FuncHandler {
 
 impl Handler for FuncHandler {
 	#[inline]
-	fn handle(&self, req: Request) -> BoxedFuture {
-		(self.f)(req)
+	fn handle<'a>(&self, req: &'a mut Request, resp: &'a mut Response) -> BoxedFuture<'a> {
+		(self.f)(req, resp)
 	}
 }
 

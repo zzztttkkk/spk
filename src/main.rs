@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+use std::sync::Arc;
+use crate::h2tp::FuncHandler;
+
 mod h2tp;
 mod json;
 
@@ -12,7 +15,13 @@ async fn main() {
 	let shutdownhandler = server.shutdownhandler();
 
 	tokio::spawn(async move {
-		server.listen("127.0.0.1:8080", None).await;
+		server.listen("127.0.0.1:8080", Some(Arc::new(FuncHandler::new(|req, resp| {
+			return Box::pin(async move {
+				println!("{req:?}; Resp @ {resp:p}");
+				println!("{}", req.method());
+				return Ok(None);
+			});
+		})))).await;
 	});
 
 	match tokio::signal::ctrl_c().await {
