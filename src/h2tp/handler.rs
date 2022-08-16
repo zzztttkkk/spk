@@ -3,7 +3,7 @@ use std::pin::Pin;
 use crate::h2tp::error::Error;
 use crate::h2tp::request::Request;
 use crate::h2tp::response::Response;
-use crate::h2tp::resp_value::ResponseValue;
+use crate::h2tp::response_value::ResponseValue;
 
 type BoxedFuture<'a> = Pin<Box<dyn Future<Output=Result<Option<Box<dyn ResponseValue>>, Error>> + Send + 'a>>;
 type FuncType = for<'a> fn(req: &'a mut Request, resp: &'a mut Response) -> BoxedFuture<'a>;
