@@ -1,13 +1,13 @@
+use crate::h2tp::utils::multi_map::MultiMap;
 use core::fmt;
 use std::fmt::{Display, Error, Formatter, Write};
-use crate::h2tp::utils::multi_map::MultiMap;
 
 pub struct Builder<'a> {
 	setter: &'a mut Setter,
 }
 
 macro_rules! simple_setter {
-    ($field:ident, $idx:expr, $vtype:ty) => {
+	($field:ident, $idx:expr, $vtype:ty) => {
 		pub fn $field(&mut self, v: $vtype) -> &mut Self {
 			self.setter.parts[$idx] = v.to_string();
 			return self;
@@ -17,9 +17,7 @@ macro_rules! simple_setter {
 
 impl<'a> Builder<'a> {
 	fn new(w: &'a mut Setter) -> Self {
-		return Self {
-			setter: w,
-		};
+		return Self { setter: w };
 	}
 
 	simple_setter!(scheme, 0, &str);
@@ -73,15 +71,21 @@ pub struct ParseErr {
 }
 
 impl ParseErr {
-	fn new(m: &'static str) -> Self { Self { msg: m } }
+	fn new(m: &'static str) -> Self {
+		Self { msg: m }
+	}
 }
 
 impl fmt::Debug for ParseErr {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result { write!(f, "UrlParseError: {}", self.msg) }
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "UrlParseError: {}", self.msg)
+	}
 }
 
 impl Display for ParseErr {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result { write!(f, "UrlParseError: {}", self.msg) }
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "UrlParseError: {}", self.msg)
+	}
 }
 
 impl std::error::Error for ParseErr {}
@@ -105,7 +109,7 @@ impl<'a> fmt::Debug for Url<'a> {
 const PATH_MISSING: &str = "Path Missing";
 
 macro_rules! getter {
-    ($field:ident, $idx:expr) => {
+	($field:ident, $idx:expr) => {
 		pub fn $field(&self) -> &str {
 			match self.setter.as_ref() {
 				Some(sref) => {
@@ -139,12 +143,8 @@ impl<'a> Url<'a> {
 	pub fn parse(v: &'a str) -> Result<Self, ParseErr> {
 		let mut obj = Self::new();
 		match obj.from(v) {
-			Some(e) => {
-				Err(e)
-			}
-			None => {
-				Ok(obj)
-			}
+			Some(e) => Err(e),
+			None => Ok(obj),
 		}
 	}
 
@@ -214,17 +214,15 @@ impl<'a> Url<'a> {
 					}
 				}
 			}
-			None => {
-				match v.find(b'#' as char) {
-					Some(idx) => {
-						self.path = &v[..idx];
-						self.fragment = &v[idx + 1..];
-					}
-					None => {
-						self.path = v;
-					}
+			None => match v.find(b'#' as char) {
+				Some(idx) => {
+					self.path = &v[..idx];
+					self.fragment = &v[idx + 1..];
 				}
-			}
+				None => {
+					self.path = v;
+				}
+			},
 		}
 		return None;
 	}
@@ -245,11 +243,14 @@ impl<'a> Url<'a> {
 
 #[cfg(test)]
 mod tests {
-	use crate::h2tp::url::{Url};
+	use crate::h2tp::url::Url;
 
 	#[test]
 	fn test_parse() {
-		println!("{:?}", Url::parse("https://:4555@a.com:567/ddd?e=45fff#err"));
+		println!(
+			"{:?}",
+			Url::parse("https://:4555@a.com:567/ddd?e=45fff#err")
+		);
 		println!("{:?}", Url::parse("er@:45"));
 
 		let mut url = Url::new();

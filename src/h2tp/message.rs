@@ -1,16 +1,16 @@
-use std::fmt;
-use std::fmt::{Formatter};
-use std::io::ErrorKind;
-use bytes::BytesMut;
-use tokio::io::{AsyncReadExt};
 use crate::h2tp::cfg::MESSAGE_BUFFER_SIZE;
 use crate::h2tp::headers::Headers;
 use crate::h2tp::{headers, types};
+use bytes::BytesMut;
+use std::fmt;
+use std::fmt::Formatter;
+use std::io::ErrorKind;
+use tokio::io::AsyncReadExt;
 
 pub struct Message {
-	pub startline: (String, String, String),
-	pub headers: Option<Headers>,
-	pub body: Option<BytesMut>,
+	pub(crate) startline: (String, String, String),
+	pub(crate) headers: Option<Headers>,
+	pub(crate) body: Option<BytesMut>,
 	buf: Option<BytesMut>,
 	bufsize: usize,
 	bufremains: usize,
@@ -58,12 +58,8 @@ impl ParseError {
 
 	pub fn is_eof(&self) -> bool {
 		return match self.ioe.as_ref() {
-			Some(v) => {
-				v.kind() == ErrorKind::UnexpectedEof
-			}
-			None => {
-				false
-			}
+			Some(v) => v.kind() == ErrorKind::UnexpectedEof,
+			None => false,
 		};
 	}
 }
@@ -91,7 +87,7 @@ impl fmt::Debug for ParseError {
 const BAD_REQUEST: &str = "bad request";
 
 impl Message {
-	pub fn new() -> Self {
+	pub(crate) fn new() -> Self {
 		return Self {
 			startline: (String::new(), String::new(), String::new()),
 			headers: None,
@@ -102,7 +98,7 @@ impl Message {
 		};
 	}
 
-	pub fn clear(&mut self) {
+	pub(crate) fn clear(&mut self) {
 		self.startline.0.clear();
 		self.startline.1.clear();
 		self.startline.2.clear();
@@ -122,7 +118,10 @@ impl Message {
 		}
 	}
 
-	pub async fn read<R: tokio::io::AsyncRead + Unpin>(&mut self, stream: &mut R) -> Option<ParseError> {
+	pub(crate) async fn read<R: tokio::io::AsyncRead + Unpin>(
+		&mut self,
+		stream: &mut R,
+	) -> Option<ParseError> {
 		if self.bufremains > 0 {
 			return None;
 		}
@@ -142,7 +141,11 @@ impl Message {
 		return None;
 	}
 
-	pub async fn read_sized_body<R: types::AsyncReader>(&mut self, stream: &mut R, cl: usize) -> Option<ParseError> {
+	pub(crate) async fn read_sized_body<R: types::AsyncReader>(
+		&mut self,
+		stream: &mut R,
+		cl: usize,
+	) -> Option<ParseError> {
 		if cl == 0 {
 			return None;
 		}
@@ -177,7 +180,10 @@ impl Message {
 		return None;
 	}
 
-	pub async fn read_byte<R: types::AsyncReader>(&mut self, stream: &mut R) -> Result<u8, ParseError> {
+	pub(crate) async fn read_byte<R: types::AsyncReader>(
+		&mut self,
+		stream: &mut R,
+	) -> Result<u8, ParseError> {
 		let bufref = self.buf.as_mut().unwrap().as_mut();
 
 		let c: u8;
@@ -197,7 +203,10 @@ impl Message {
 		return Ok(c);
 	}
 
-	pub async fn read_chunked_body<R: types::AsyncReader>(&mut self, stream: &mut R) -> Option<ParseError> {
+	pub(crate) async fn read_chunked_body<R: types::AsyncReader>(
+		&mut self,
+		stream: &mut R,
+	) -> Option<ParseError> {
 		let mut current_chunk_size: Option<usize> = None;
 		let mut numbuf = String::new();
 		let mut skip_newline = false;
@@ -243,44 +252,45 @@ impl Message {
 						numbuf.push(c as char);
 					}
 				}
-				Some(remain) => {
-					match self.read_sized_body(stream, remain).await {
-						Some(e) => {
-							return Some(e);
+				Some(remain) => match self.read_sized_body(stream, remain).await {
+					Some(e) => {
+						return Some(e);
+					}
+					None => {
+						match self.read_byte(stream).await {
+							Ok(c) => {
+								if c != b'\r' {
+									return Some(ParseError::ue(BAD_REQUEST));
+								}
+							}
+							Err(e) => {
+								return Some(e);
+							}
 						}
-						None => {
-							match self.read_byte(stream).await {
-								Ok(c) => {
-									if c != b'\r' {
-										return Some(ParseError::ue(BAD_REQUEST));
-									}
-								}
-								Err(e) => {
-									return Some(e);
+						match self.read_byte(stream).await {
+							Ok(c) => {
+								if c != b'\n' {
+									return Some(ParseError::ue(BAD_REQUEST));
 								}
 							}
-							match self.read_byte(stream).await {
-								Ok(c) => {
-									if c != b'\n' {
-										return Some(ParseError::ue(BAD_REQUEST));
-									}
-								}
-								Err(e) => {
-									return Some(e);
-								}
+							Err(e) => {
+								return Some(e);
 							}
-							if remain == 0 {
-								break;
-							}
+						}
+						if remain == 0 {
+							break;
 						}
 					}
-				}
+				},
 			}
 		}
 		return None;
 	}
 
-	pub async fn read_body<R: types::AsyncReader>(&mut self, stream: &mut R) -> Option<ParseError> {
+	pub(crate) async fn read_body<R: types::AsyncReader>(
+		&mut self,
+		stream: &mut R,
+	) -> Option<ParseError> {
 		let mut cl: Option<usize> = None;
 		match &self.headers {
 			Some(href) => {
@@ -327,7 +337,10 @@ impl Message {
 		return None;
 	}
 
-	pub async fn from<R: types::AsyncReader>(&mut self, stream: &mut R) -> Option<ParseError> {
+	pub(crate) async fn from<R: types::AsyncReader>(
+		&mut self,
+		stream: &mut R,
+	) -> Option<ParseError> {
 		if self.buf.is_none() {
 			let mut buf = BytesMut::with_capacity(MESSAGE_BUFFER_SIZE);
 			unsafe {
@@ -400,10 +413,9 @@ impl Message {
 									self.headers = Some(Headers::new());
 								}
 								let headersref = self.headers.as_mut().unwrap();
-								headersref.builder().append(
-									&hkey.trim().to_ascii_lowercase(),
-									&hval.trim(),
-								);
+								headersref
+									.builder()
+									.append(&hkey.trim().to_ascii_lowercase(), &hval.trim());
 								hkey.clear();
 								hval.clear();
 								hkvsep = false;
@@ -434,7 +446,7 @@ impl Message {
 		return self.read_body(stream).await;
 	}
 
-	pub fn headers_builder(&mut self) -> headers::Builder {
+	pub(crate) fn headers_builder(&mut self) -> headers::Builder {
 		if self.headers.is_none() {
 			self.headers = Some(Headers::new());
 		}
