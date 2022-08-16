@@ -2,7 +2,6 @@ use std::net::SocketAddr;
 use std::sync::{Arc};
 use std::sync::atomic::{AtomicBool};
 use tokio::io::{AsyncWriteExt};
-use tokio::sync::{RwLock};
 use crate::h2tp::cfg::ATOMIC_ORDERING;
 use crate::h2tp::handler::Handler;
 use crate::h2tp::request::Request;
@@ -21,22 +20,19 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 		return Self { addr, r, w, server_is_closing };
 	}
 
-	pub async fn as_server<'a>(&mut self, handler: Arc<Box<dyn Handler<'a> + Send + Sync>>) {
+	pub async fn as_server(&mut self, handler: Arc<dyn Handler + Send + Sync>) {
 		loop {
 			let mut req = Request::new();
-			let mut resp = Response::new();
 
-			(req.from(&mut self.r).await).unwrap();
+			req.from(&mut self.r).await.unwrap();
 
-			(handler.handle(&mut req, &mut resp).await).err();
+			let mut resp = handler.handle(req).await.unwrap();
 
 			if self.server_is_closing.load(ATOMIC_ORDERING) {
 				return;
 			}
 
 			self.w.write(b"HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nHello World").await.err();
-
-			// req.clear();
 		}
 	}
 }

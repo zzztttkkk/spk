@@ -30,7 +30,7 @@ pub fn server() -> server::Server {
 	return server::Server::new();
 }
 
-pub type FuncHandler<'a> = handler::FuncHandler<'a>;
+pub use handler::FuncHandler;
 
 #[macro_export]
 macro_rules! func {
