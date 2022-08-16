@@ -107,6 +107,7 @@ impl<'a> fmt::Debug for Url<'a> {
 }
 
 const PATH_MISSING: &str = "Path Missing";
+const IPV6_ENDING_CHAR_MISSING: &str = "Ipv6 Ending-Char Missing";
 
 macro_rules! getter {
 	($field:ident, $idx:expr) => {
@@ -158,7 +159,7 @@ impl<'a> Url<'a> {
 			None => {}
 		}
 
-		match v.find(b'@' as char) {
+		match v.find('@') {
 			Some(idx) => {
 				let userinfo = &v[..idx];
 				v = &v[idx + 1..];
@@ -176,16 +177,30 @@ impl<'a> Url<'a> {
 		}
 
 		let mut hosted = false;
-		match v.find(b':' as char) {
-			Some(idx) => {
-				self.host = &v[..idx];
-				v = &v[idx + 1..];
-				hosted = true;
+
+		if v.chars().nth(0) == Some('[') {
+			match v.rfind(']') {
+				Some(idx) => {
+					self.host = &v[..idx + 1];
+					v = &v[idx + 1..];
+					hosted = true;
+				}
+				None => {
+					return Some(ParseErr::new(IPV6_ENDING_CHAR_MISSING));
+				}
 			}
-			None => {}
+		} else {
+			match v.rfind(':') {
+				Some(idx) => {
+					self.host = &v[..idx];
+					v = &v[idx + 1..];
+					hosted = true;
+				}
+				None => {}
+			}
 		}
 
-		match v.find(b'/' as char) {
+		match v.find('/') {
 			Some(idx) => {
 				if !hosted {
 					self.host = &v[..idx];
@@ -199,12 +214,12 @@ impl<'a> Url<'a> {
 			}
 		}
 
-		match v.find(b'?' as char) {
+		match v.find('?') {
 			Some(idx) => {
 				self.path = &v[..idx];
 				v = &v[idx + 1..];
 
-				match v.find(b'#' as char) {
+				match v.find('#') {
 					Some(idx) => {
 						self.rawquery = &v[..idx];
 						self.fragment = &v[idx + 1..];
@@ -214,7 +229,7 @@ impl<'a> Url<'a> {
 					}
 				}
 			}
-			None => match v.find(b'#' as char) {
+			None => match v.find('#') {
 				Some(idx) => {
 					self.path = &v[..idx];
 					self.fragment = &v[idx + 1..];
@@ -249,7 +264,7 @@ mod tests {
 	fn test_parse() {
 		println!(
 			"{:?}",
-			Url::parse("https://:4555@a.com:567/ddd?e=45fff#err")
+			Url::parse("https://ztk:12133_=.dd@[fe80::1ff:fe23:4567:890a:4555]:8080/ddd?e=45fff#err")
 		);
 		println!("{:?}", Url::parse("er@:45"));
 

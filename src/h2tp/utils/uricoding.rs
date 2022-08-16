@@ -2,6 +2,13 @@ use crate::h2tp::utils::uricoding_excepts::ENCODE_URI_EXCEPTS;
 
 const UPPERHEX: &[u8] = "0123456789ABCDEF".as_bytes();
 
+#[inline]
+fn percent_encode(dist: &mut String, v: u8) {
+	dist.push('%');
+	dist.push(UPPERHEX[(v as usize) >> 4] as char);
+	dist.push(UPPERHEX[(v as usize) & 15] as char);
+}
+
 pub fn encode_uri(dist: &mut String, src: &str) {
 	let bytes = src.as_bytes();
 	for i in 0..bytes.len() {
@@ -10,13 +17,11 @@ pub fn encode_uri(dist: &mut String, src: &str) {
 			dist.push(b as char);
 			continue;
 		}
-		dist.push('%');
-		dist.push((UPPERHEX[(b as usize) >> 4]) as char);
-		dist.push((UPPERHEX[(b as usize) & 15]) as char)
+		percent_encode(dist, b);
 	}
 }
 
-pub fn encode_uri_component(_dist: &mut str, _src: &str) {}
+pub fn encode_uri_component(_dist: &mut String, _src: &str) {}
 
 pub fn decode_uri(_dist: &mut str, _src: &str) {}
 
