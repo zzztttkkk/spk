@@ -179,7 +179,7 @@ impl<'a> Url<'a> {
 		let mut hosted = false;
 
 		if v.chars().nth(0) == Some('[') {
-			match v.rfind(']') {
+			match v.find(']') {
 				Some(idx) => {
 					self.host = &v[..idx + 1];
 					v = &v[idx + 1..];
@@ -266,8 +266,11 @@ mod tests {
 			"{:?}",
 			Url::parse("https://ztk:12133_=.dd@[fe80::1ff:fe23:4567:890a:4555]:8080/ddd?e=45fff#err")
 		);
-		println!("{:?}", Url::parse("er@:45"));
+		println!("{:?}", Url::parse("er@:45/"));
+	}
 
+	#[test]
+	fn test_build() {
 		let mut url = Url::new();
 		url.builder().scheme("XXX").port(12555);
 		println!("Scheme: {}", url.scheme());
