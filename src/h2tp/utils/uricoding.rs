@@ -37,6 +37,7 @@ pub fn encode_uri_component(dest: &mut String, src: &str) {
 
 pub fn decode_uri(dest: &mut String, src: &str) -> bool {
 	let bytes = src.as_bytes();
+	let mut buf: Vec<u8> = Vec::with_capacity(src.len());
 
 	let mut i = 0;
 	loop {
@@ -46,26 +47,37 @@ pub fn decode_uri(dest: &mut String, src: &str) -> bool {
 
 		let c = bytes[i];
 		if c == b'%' {
-			if i + 3 >= bytes.len() {
+			if i + 2 >= bytes.len() {
 				return false;
 			}
 
 			let x2 = HEX_TO_INT_TABLE[bytes[i + 2] as usize];
 			let x1 = HEX_TO_INT_TABLE[bytes[i + 1] as usize];
 			if x1 == 16 && x2 == 16 {
-				dest.push('%');
+				buf.push(b'%');
 				i += 3;
 				continue;
 			}
-			dest.push((x1 << 4 | x2) as char);
+			buf.push(x1 << 4 | x2);
 			i += 3;
 		} else {
-			dest.push(c as char);
+			buf.push(c);
 			i += 1;
 		}
 	}
-	return true;
+
+	match String::from_utf8(buf) {
+		Ok(val) => {
+			dest.push_str(val.as_str());
+			return true;
+		}
+		Err(_) => {
+			return false;
+		}
+	}
 }
+
+pub fn decode_formed() {}
 
 #[cfg(test)]
 mod tests {
@@ -74,7 +86,7 @@ mod tests {
 	#[test]
 	fn test_encode_uri() {
 		let mut dist = String::with_capacity(100);
-		encode_uri(&mut dist, "ABC abc 123 xxx");
+		encode_uri(&mut dist, "ABC abc 123 xxx 我😊=?xxx");
 		println!("1 {}", dist);
 		let mut x = String::with_capacity(100);
 		decode_uri(&mut x, dist.as_str());
