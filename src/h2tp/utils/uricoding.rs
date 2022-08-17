@@ -85,11 +85,11 @@ mod tests {
 
 	#[test]
 	fn test_encode_uri() {
-		let mut dist = String::with_capacity(100);
-		encode_uri(&mut dist, "ABC abc 123 xxx 我😊=?xxx");
-		println!("1 {}", dist);
-		let mut x = String::with_capacity(100);
-		decode_uri(&mut x, dist.as_str());
-		println!("2 {}", x);
+		let mut dest = String::with_capacity(100);
+		encode_uri(&mut dest, "ABC abc 123 xxx 我😊=?xxx");
+		println!("1 {}", dest);
+		let mut raw_dest = String::with_capacity(100);
+		decode_uri(&mut raw_dest, dest.as_str());
+		println!("2 {}", raw_dest);
 	}
 }
