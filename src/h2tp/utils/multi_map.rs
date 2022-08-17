@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 
+/// 使用`RefCell<Vec<String>>`也可以，同时还能避免交换位置时发生`memcopy`。
+/// 但`Vec`只是一个很小很简单的结构体，即使发生`memcopy`，代价也比`RefCell`要小。
+/// 没有具体的性能测试，但是感觉至少相差不大。所以不如保持简单。
 type Values = Vec<String>;
 
 fn values(v: &str) -> Values {

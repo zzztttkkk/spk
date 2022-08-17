@@ -387,6 +387,10 @@ impl Message {
 						if c == b' ' {
 							status = ParseStatus::Startline1;
 						} else {
+							if c > 127 {
+								return Some(ParseError::ue(BAD_REQUEST));
+							}
+
 							self.startline.0.push(c as char);
 						}
 					}

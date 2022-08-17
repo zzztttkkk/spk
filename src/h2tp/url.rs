@@ -149,6 +149,11 @@ impl<'a> Url<'a> {
 		}
 	}
 
+	/// #### url:
+	/// `[scheme://][[username:][password]@][host:port]/[path][?rawquery][#fragment]`
+	/// #### host:
+	/// - ipv4 or hostname: direct
+	/// - ipv6: [2001:db8:1f70::999:de8:7648:6e8]
 	pub fn from(&mut self, v: &'a str) -> Option<ParseErr> {
 		let mut v = &v[0..];
 		match v.find("://") {
@@ -264,7 +269,9 @@ mod tests {
 	fn test_parse() {
 		println!(
 			"{:?}",
-			Url::parse("https://ztk:12133_=.dd@[fe80::1ff:fe23:4567:890a:4555]:8080/ddd?e=45fff#err")
+			Url::parse(
+				"https://ztk:12133_=.dd@[fe80::1ff:fe23:4567:890a:4555]:8080/ddd?e=45fff#err"
+			)
 		);
 		println!("{:?}", Url::parse("er@:45/"));
 	}
