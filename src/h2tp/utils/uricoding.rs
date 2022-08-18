@@ -80,6 +80,9 @@ pub fn decode_uri(dest: &mut Vec<u8>, src: &str) -> bool {
 		if c == b'%' {
 			write_percents!(i, bytes, dest);
 		} else {
+			if !ENCODE_URI_EXCEPTS[c as usize] {
+				return false;
+			}
 			dest.push(c);
 			i += 1;
 		}
@@ -129,9 +132,13 @@ mod tests {
 		let mut dest = Vec::with_capacity(100);
 		encode_uri(&mut dest, "ABC abc 123 xxx 我😊=?xxx");
 		println!("1 {}", vec2str!(dest));
-		let mut raw_dest = Vec::with_capacity(100);
-		decode_uri(&mut raw_dest, vec2str!(dest));
-		println!("2 {}", vec2str!(raw_dest));
+	}
+
+	#[test]
+	fn test_decode() {
+		let mut dest = Vec::with_capacity(100);
+		let ok = decode_uri(&mut dest, "=dsdasd*&");
+		println!("{ok}");
 	}
 
 	#[test]

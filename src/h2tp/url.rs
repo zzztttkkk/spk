@@ -28,7 +28,9 @@ impl<'a> Builder<'a> {
 	simple_setter!(host, 3, &str);
 	simple_setter!(port, 4, u16);
 
-	pub fn rawquery(&mut self, v: &str) -> &mut Self {
+	/// the `unsafe` means `v` must be escaped, this method
+	/// never failed even if the unescaped characters in `v`.
+	pub unsafe fn rawquery(&mut self, v: &str) -> &mut Self {
 		match self.setter.query.as_mut() {
 			Some(qmref) => {
 				qmref.clear();
@@ -42,6 +44,41 @@ impl<'a> Builder<'a> {
 		let mut rv = v;
 		let mut key_buf: Vec<u8> = vec![];
 		let mut val_buf: Vec<u8> = vec![];
+
+		let append_ignore_err = |cv: &str, idx: usize, kbuf: &mut Vec<u8>, vbuf: &mut Vec<u8>, mref: &mut MultiMap| {
+			kbuf.clear();
+			if !uricoding::decode_uri(kbuf, &cv[..idx]) {
+				return;
+			}
+
+			let key;
+			match std::str::from_utf8(kbuf) {
+				Ok(v) => {
+					key = v;
+				}
+				Err(_) => {
+					return;
+				}
+			}
+
+			vbuf.clear();
+			if !uricoding::decode_uri(vbuf, &cv[idx + 1..]) {
+				return;
+			}
+
+			let val;
+			match std::str::from_utf8(vbuf) {
+				Ok(v) => {
+					val = v;
+				}
+				Err(_) => {
+					return;
+				}
+			}
+
+			mref.append(key, val);
+		};
+
 		loop {
 			if rv.is_empty() {
 				break;
@@ -64,48 +101,31 @@ impl<'a> Builder<'a> {
 
 			match cv.find('=') {
 				Some(idx) => {
-					key_buf.clear();
-					uricoding::encode_uri_component(&mut key_buf, &cv[..idx]);
-					let key = unsafe { std::str::from_utf8_unchecked(&key_buf) };
-
-					val_buf.clear();
-					uricoding::encode_uri_component(&mut val_buf, &cv[idx + 1..]);
-					let val = unsafe { std::str::from_utf8_unchecked(&val_buf) };
-					qmref.append(key, val);
+					append_ignore_err(cv, idx, &mut key_buf, &mut val_buf, qmref);
 				}
-				None => {}
+				None => {
+					key_buf.clear();
+					if uricoding::decode_uri(&mut key_buf, cv) {
+						match std::str::from_utf8(&key_buf) {
+							Ok(key) => {
+								qmref.append(key, "");
+							}
+							Err(_) => {}
+						}
+					}
+				}
 			}
 		}
 		return self;
 	}
 
 	pub fn path(&mut self, v: &str) -> &mut Self {
-		let path: &str;
-		let query: &str;
-		match v.find('?') {
-			Some(idx) => {
-				path = &v[..idx];
-				query = &v[idx + 1..];
-			}
-			None => {
-				path = v;
-				query = "";
-			}
-		}
-
 		let vref = &mut self.setter.parts[5];
 		vref.clear();
-
-		if path.chars().nth(0).unwrap() != (b'/' as char) {
+		if v.chars().nth(0).unwrap() != (b'/' as char) {
 			vref.push(b'/' as char);
 		}
-		if !path.is_empty() {
-			vref.push_str(path);
-		}
-
-		if !query.is_empty() {
-			self.rawquery(query);
-		}
+		vref.push_str(v);
 		return self;
 	}
 
@@ -114,70 +134,6 @@ impl<'a> Builder<'a> {
 			self.setter.query = Some(MultiMap::new());
 		}
 		return self.setter.query.as_mut().unwrap();
-	}
-}
-
-struct Query {
-	raw: MultiMap,
-	keybuf: Option<Vec<u8>>,
-	valbuf: Option<Vec<u8>>,
-}
-
-impl Query {
-	pub fn new() -> Self {
-		return Self {
-			raw: MultiMap::new(),
-			keybuf: None,
-			valbuf: None,
-		};
-	}
-
-	#[inline]
-	pub fn clear(&mut self) {
-		self.raw.clear();
-	}
-
-	fn ensure_buf(&mut self) {
-		if self.keybuf.is_none() {
-			self.keybuf = Some(vec![]);
-		}
-		if self.valbuf.is_none() {
-			self.valbuf = Some(vec![]);
-		}
-	}
-
-	pub fn append(&mut self, key: &str, val: &str) {
-		self.ensure_buf();
-		let (keybuf, valbuf) = (self.keybuf.as_mut().unwrap(), self.valbuf.as_mut().unwrap());
-		keybuf.clear();
-		valbuf.clear();
-
-		uricoding::encode_uri_component(keybuf, key);
-		uricoding::encode_uri_component(valbuf, val);
-
-		unsafe {
-			self.raw.append(
-				std::str::from_utf8_unchecked(keybuf),
-				std::str::from_utf8_unchecked(valbuf),
-			);
-		}
-	}
-
-	pub fn reset(&mut self, key: &str, val: &str) {
-		self.ensure_buf();
-		let (keybuf, valbuf) = (self.keybuf.as_mut().unwrap(), self.valbuf.as_mut().unwrap());
-		keybuf.clear();
-		valbuf.clear();
-
-		uricoding::encode_uri_component(keybuf, key);
-		uricoding::encode_uri_component(valbuf, val);
-
-		unsafe {
-			self.raw.reset(
-				std::str::from_utf8_unchecked(keybuf),
-				std::str::from_utf8_unchecked(valbuf),
-			);
-		}
 	}
 }
 
@@ -476,7 +432,11 @@ mod tests {
 	fn test_url_builder_rawquery() {
 		let mut url = Url::new();
 		let mut builder = url.builder();
-		let query = builder.rawquery("a=er&b=rtrt").query();
+		unsafe {
+			builder.rawquery("a=er&b=rtrt&rt&yui&我=3434&yui=90#err");
+		}
+		let query = builder.query();
+		query.append("yui", "444");
 		println!("{:?}", query);
 	}
 }
