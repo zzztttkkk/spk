@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 /// 使用`RefCell<Vec<String>>`也可以，同时还能避免交换位置时发生`memcopy`。
 /// 但`Vec`只是一个很小很简单的结构体，即使发生`memcopy`，代价也比`RefCell`要小。
@@ -193,7 +193,7 @@ impl MultiMap {
 		};
 	}
 
-	pub fn each(&self, func: fn(k: &str, v: &str)) {
+	pub fn each<'a>(&'a self, func: fn(k: &'a str, v: &'a str)) {
 		match self.map.as_ref() {
 			Some(mapref) => {
 				for (k, valsref) in mapref.iter() {
@@ -215,6 +215,34 @@ impl MultiMap {
 				None => {}
 			},
 		}
+	}
+}
+
+impl fmt::Debug for MultiMap {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "MultiMap(")?;
+		match self.map.as_ref() {
+			Some(mapref) => {
+				for (k, valsref) in mapref.iter() {
+					for v in valsref.iter() {
+						write!(f, "`{}`=`{}`;", k, v)?;
+					}
+				}
+			}
+			None => match self.ary.as_ref() {
+				Some(aryref) => {
+					for i in 0..aryref.keys.len() {
+						let k = &aryref.keys[i];
+						let valsref = &aryref.vals[i];
+						for v in valsref.iter() {
+							write!(f, "`{}`=`{}`;", k, v)?;
+						}
+					}
+				}
+				None => {}
+			},
+		}
+		write!(f, ")")
 	}
 }
 
