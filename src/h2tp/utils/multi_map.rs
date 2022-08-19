@@ -63,7 +63,10 @@ impl AryMap {
 				vals.clear();
 				vals.push(v.to_string());
 			}
-			None => {}
+			None => {
+				self.keys.push(k.to_string());
+				self.vals.push(values(v));
+			}
 		}
 	}
 
@@ -167,12 +170,13 @@ impl MultiMap {
 					}
 				}
 			}
-			None => match self.ary.as_mut() {
-				Some(aryref) => {
-					aryref.reset(k, v);
+			None => {
+				if self.ary.is_none() {
+					self.ary = Some(AryMap::new());
 				}
-				None => {}
-			},
+				let aryref = self.ary.as_mut().unwrap();
+				aryref.reset(k, v);
+			}
 		}
 	}
 
