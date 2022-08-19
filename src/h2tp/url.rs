@@ -45,39 +45,40 @@ impl<'a> Builder<'a> {
 		let mut key_buf: Vec<u8> = vec![];
 		let mut val_buf: Vec<u8> = vec![];
 
-		let append_ignore_err = |cv: &str, idx: usize, kbuf: &mut Vec<u8>, vbuf: &mut Vec<u8>, mref: &mut MultiMap| {
-			kbuf.clear();
-			if !uricoding::decode_uri(kbuf, &cv[..idx]) {
-				return;
-			}
-
-			let key;
-			match std::str::from_utf8(kbuf) {
-				Ok(v) => {
-					key = v;
-				}
-				Err(_) => {
+		let append_ignore_err =
+			|cv: &str, idx: usize, kbuf: &mut Vec<u8>, vbuf: &mut Vec<u8>, mref: &mut MultiMap| {
+				kbuf.clear();
+				if !uricoding::decode_uri(kbuf, &cv[..idx]) {
 					return;
 				}
-			}
 
-			vbuf.clear();
-			if !uricoding::decode_uri(vbuf, &cv[idx + 1..]) {
-				return;
-			}
-
-			let val;
-			match std::str::from_utf8(vbuf) {
-				Ok(v) => {
-					val = v;
+				let key;
+				match std::str::from_utf8(kbuf) {
+					Ok(v) => {
+						key = v;
+					}
+					Err(_) => {
+						return;
+					}
 				}
-				Err(_) => {
+
+				vbuf.clear();
+				if !uricoding::decode_uri(vbuf, &cv[idx + 1..]) {
 					return;
 				}
-			}
 
-			mref.append(key, val);
-		};
+				let val;
+				match std::str::from_utf8(vbuf) {
+					Ok(v) => {
+						val = v;
+					}
+					Err(_) => {
+						return;
+					}
+				}
+
+				mref.append(key, val);
+			};
 
 		loop {
 			if rv.is_empty() {
@@ -136,11 +137,9 @@ impl<'a> Builder<'a> {
 		return self.setter.query.as_mut().unwrap();
 	}
 }
-
 struct Setter {
 	parts: [String; 8],
 	query: Option<MultiMap>,
-	querybuf: Option<Vec<u8>>,
 }
 
 impl Setter {
@@ -148,12 +147,38 @@ impl Setter {
 		return Self {
 			parts: Default::default(),
 			query: None,
-			querybuf: None,
 		};
 	}
 
-	fn rawquery(&self) -> &str {
-		return "";
+	fn rawquery<'a>(&self, dest: &'a mut Vec<u8>) -> &'a str {
+		dest.clear();
+
+		if self.query.is_none() {
+			return unsafe { std::str::from_utf8_unchecked(dest.as_slice()) };
+		}
+
+		let mut kbuf = vec![];
+		let mut vbuf = vec![];
+
+		self.query.as_ref().unwrap().each(|k, v, is_last| {
+			kbuf.clear();
+			vbuf.clear();
+			if k.len() > kbuf.capacity() {
+				kbuf.reserve(k.len() - kbuf.capacity());
+			}
+			if v.len() > vbuf.capacity() {
+				vbuf.reserve(v.len() - vbuf.capacity());
+			}
+			uricoding::encode_uri_component(&mut kbuf, k);
+			uricoding::encode_uri_component(&mut vbuf, v);
+			dest.append(&mut kbuf);
+			dest.push(b'=');
+			dest.append(&mut vbuf);
+			if !is_last {
+				dest.push(b'&');
+			}
+		});
+		return unsafe { std::str::from_utf8_unchecked(dest.as_slice()) };
 	}
 }
 
@@ -394,15 +419,22 @@ impl<'a> Url<'a> {
 
 	getter!(path, 5);
 
-	pub fn rawquery(&self) -> &str {
+	pub fn rawquery(&self, dest: &'a mut Option<Vec<u8>>) -> &'a str {
 		match self.setter.as_ref() {
 			Some(setter) => {
-				return setter.rawquery();
+				if dest.is_none() {
+					*dest = Some(Vec::with_capacity(256));
+				}
+				return setter.rawquery(dest.as_mut().unwrap());
 			}
 			None => {
 				return self.rawquery;
 			}
 		}
+	}
+
+	pub fn query(&self) {
+		
 	}
 }
 
@@ -438,5 +470,23 @@ mod tests {
 		let query = builder.query();
 		query.append("yui", "444");
 		println!("{:?}", query);
+
+		let mut x = vec![0; 3];
+		println!("{}", x.capacity());
+		x.reserve(0);
+		println!("{}", x.capacity());
+	}
+
+	#[test]
+	fn test_query() {
+		let mut url = Url::parse("/?a=34&b=546").unwrap();
+		let mut opt_dest = None;
+		println!("{}", url.rawquery(&mut opt_dest));
+		let mut builder = url.builder();
+		let query = builder.query();
+		query.append("x", "er");
+		query.append(" x ", "😄");
+		println!("{}", url.rawquery(&mut opt_dest));
+		println!("{:?}", opt_dest);
 	}
 }

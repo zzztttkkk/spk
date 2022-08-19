@@ -1,11 +1,11 @@
-use std::fmt;
-use std::fmt::{Formatter};
 use crate::h2tp::utils::multi_map::MultiMap;
+use std::fmt;
+use std::fmt::Formatter;
 
 macro_rules! pub_str_const {
-		($name:ident, $val:expr) => {
-			pub const $name: &str = $val;
-		};
+	($name:ident, $val:expr) => {
+		pub const $name: &str = $val;
+	};
 }
 
 pub mod hns {
@@ -105,22 +105,21 @@ impl<'h> Builder<'h> {
 }
 
 macro_rules! getone {
-    ($name:ident -> $key:expr) => {
+	($name:ident -> $key:expr) => {
 		pub fn $name(&self) -> Option<&String> {
 			return self.m.getone($key);
 		}
 	};
 }
 
-
 impl Headers {
 	pub fn new() -> Self {
-		return Self {
-			m: MultiMap::new(),
-		};
+		return Self { m: MultiMap::new() };
 	}
 
-	pub fn builder(&mut self) -> Builder { return Builder { headers: self }; }
+	pub fn builder(&mut self) -> Builder {
+		return Builder { headers: self };
+	}
 
 	pub fn content_length(&self) -> Option<usize> {
 		match self.m.getone(hns::CONTENT_LENGTH) {
@@ -132,14 +131,10 @@ impl Headers {
 						}
 						return Some(num as usize);
 					}
-					Err(_) => {
-						None
-					}
+					Err(_) => None,
 				};
 			}
-			None => {
-				None
-			}
+			None => None,
 		}
 	}
 
@@ -149,22 +144,22 @@ impl Headers {
 
 	pub fn is_chunked(&self) -> bool {
 		return match self.transfer_encoding() {
-			Some(v) => {
-				v.contains("chunked")
-			}
-			None => {
-				false
-			}
+			Some(v) => v.contains("chunked"),
+			None => false,
 		};
 	}
 }
 
 impl fmt::Debug for Headers {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "Headers<\r\n")?;
-		self.m.each(|k, v| {
-			println!("\t{}: {}", k, v);
+		write!(f, "Headers(")?;
+		self.m.each(|k, v, is_last| {
+			if is_last {
+				_ = write!(f, " {} = {}", k, v);
+			} else {
+				_ = write!(f, " {} = {};", k, v);
+			}
 		});
-		write!(f, ">")
+		write!(f, ")")
 	}
 }

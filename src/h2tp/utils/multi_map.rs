@@ -193,22 +193,29 @@ impl MultiMap {
 		};
 	}
 
-	pub fn each<'a>(&'a self, func: fn(k: &'a str, v: &'a str)) {
+	pub fn each<F: FnMut(&str, &str, bool)>(&self, mut func: F) {
 		match self.map.as_ref() {
 			Some(mapref) => {
+				let l1 = mapref.len();
+				let mut i = 0;
 				for (k, valsref) in mapref.iter() {
-					for v in valsref.iter() {
-						func(k, v);
+					let l2 = valsref.len();
+					for j in 0..l2 {
+						func(k, &(valsref[j]), i == l1 - 1 && j == l2 - 1);
 					}
+					i += 1;
 				}
 			}
 			None => match self.ary.as_ref() {
 				Some(aryref) => {
-					for i in 0..aryref.keys.len() {
+					let l1 = aryref.keys.len();
+
+					for i in 0..l1 {
 						let k = &aryref.keys[i];
 						let valsref = &aryref.vals[i];
-						for v in valsref.iter() {
-							func(k, v);
+						let l2 = valsref.len();
+						for j in 0..l2 {
+							func(k, &valsref[j], i == l1 - 1 && j == l2 - 1);
 						}
 					}
 				}
@@ -221,27 +228,13 @@ impl MultiMap {
 impl fmt::Debug for MultiMap {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		write!(f, "MultiMap(")?;
-		match self.map.as_ref() {
-			Some(mapref) => {
-				for (k, valsref) in mapref.iter() {
-					for v in valsref.iter() {
-						write!(f, "`{}`=`{}`;", k, v)?;
-					}
-				}
+		self.each(|k, v, is_last| {
+			if is_last {
+				_ = write!(f, " {} = {}", k, v);
+			} else {
+				_ = write!(f, " {} = {};", k, v);
 			}
-			None => match self.ary.as_ref() {
-				Some(aryref) => {
-					for i in 0..aryref.keys.len() {
-						let k = &aryref.keys[i];
-						let valsref = &aryref.vals[i];
-						for v in valsref.iter() {
-							write!(f, "`{}`=`{}`;", k, v)?;
-						}
-					}
-				}
-				None => {}
-			},
-		}
+		});
 		write!(f, ")")
 	}
 }
@@ -259,7 +252,9 @@ mod tests {
 		mm.clear();
 		mm.remove("a");
 		mm.append("a", "2");
-		mm.append("a", "4");
+		mm.append("a", "423");
+
+		println!("{:?}", mm);
 	}
 
 	#[test]
@@ -269,6 +264,8 @@ mod tests {
 		for i in 0..40 {
 			mm.append(&format!("k{}", i), &format!("v{}", i));
 		}
+
+		println!("{:?}", mm);
 	}
 
 	struct Obj {
