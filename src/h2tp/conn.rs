@@ -9,6 +9,8 @@ use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 
+use super::ctx::Context;
+
 pub struct Conn<R: AsyncReader, W: AsyncWriter> {
 	addr: SocketAddr,
 	r: R,
@@ -29,6 +31,7 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 	pub async fn as_server(&mut self, handler: Arc<Mutex<Box<dyn Handler + Send + Sync>>>) {
 		let mut req = Request::new();
 		let mut resp = Response::new();
+		let mut _ctx = Context::new(self);
 
 		loop {
 			match req.from(&mut self.r).await {
