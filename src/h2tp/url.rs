@@ -137,6 +137,7 @@ impl<'a> Builder<'a> {
 		return self.setter.query.as_mut().unwrap();
 	}
 }
+
 struct Setter {
 	parts: [String; 8],
 	query: Option<MultiMap>,
@@ -177,6 +178,7 @@ impl Setter {
 			if !is_last {
 				dest.push(b'&');
 			}
+			return true;
 		});
 		return unsafe { std::str::from_utf8_unchecked(dest.as_slice()) };
 	}
@@ -433,9 +435,7 @@ impl<'a> Url<'a> {
 		}
 	}
 
-	pub fn query(&self) {
-		
-	}
+	pub fn query(&self) {}
 }
 
 #[cfg(test)]

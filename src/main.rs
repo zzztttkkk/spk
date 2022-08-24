@@ -23,7 +23,7 @@ async fn main() {
 
 					let mut respw = resp.builder();
 					_ = respw.write(b"0.0");
-					return Ok(None);
+					return Ok(());
 				}))),
 			)
 			.await;

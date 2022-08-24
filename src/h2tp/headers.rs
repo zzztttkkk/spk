@@ -155,10 +155,11 @@ impl fmt::Debug for Headers {
 		write!(f, "Headers(")?;
 		self.m.each(|k, v, is_last| {
 			if is_last {
-				_ = write!(f, " {} = {}", k, v);
+				let _ = write!(f, " {} = {}", k, v);
 			} else {
-				_ = write!(f, " {} = {};", k, v);
+				let _ = write!(f, " {} = {};", k, v);
 			}
+			return true;
 		});
 		write!(f, ")")
 	}

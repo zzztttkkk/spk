@@ -25,7 +25,7 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 		};
 	}
 
-	pub async fn as_server(&mut self, handler: Arc<dyn Handler + Send + Sync>) {
+	pub async fn as_server(&mut self, handler: &mut dyn Handler) {
 		let mut req = Request::new();
 		let mut resp = Response::new();
 

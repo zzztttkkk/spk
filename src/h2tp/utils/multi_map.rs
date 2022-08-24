@@ -197,7 +197,48 @@ impl MultiMap {
 		};
 	}
 
-	pub fn each<F: FnMut(&str, &str, bool)>(&self, mut func: F) {
+	pub fn eachmut<F>(&mut self, mut func: F)
+	where
+		F: FnMut(&str, &mut str, bool) -> bool,
+	{
+		match self.map.as_mut() {
+			Some(mapref) => {
+				let l1 = mapref.len();
+				let mut i = 0;
+				for (k, valsref) in mapref.iter_mut() {
+					let l2 = valsref.len();
+					for j in 0..l2 {
+						if !func(k, &mut (valsref[j]), i == l1 - 1 && j == l2 - 1) {
+							break;
+						};
+					}
+					i += 1;
+				}
+			}
+			None => match self.ary.as_mut() {
+				Some(aryref) => {
+					let l1 = aryref.keys.len();
+
+					for i in 0..l1 {
+						let k = &aryref.keys[i];
+						let valsref = &mut aryref.vals[i];
+						let l2 = valsref.len();
+						for j in 0..l2 {
+							if !func(k, &mut valsref[j], i == l1 - 1 && j == l2 - 1) {
+								break;
+							}
+						}
+					}
+				}
+				None => {}
+			},
+		}
+	}
+
+	pub fn each<F>(&self, mut func: F)
+	where
+		F: FnMut(&str, &str, bool) -> bool,
+	{
 		match self.map.as_ref() {
 			Some(mapref) => {
 				let l1 = mapref.len();
@@ -205,7 +246,9 @@ impl MultiMap {
 				for (k, valsref) in mapref.iter() {
 					let l2 = valsref.len();
 					for j in 0..l2 {
-						func(k, &(valsref[j]), i == l1 - 1 && j == l2 - 1);
+						if !func(k, &(valsref[j]), i == l1 - 1 && j == l2 - 1) {
+							break;
+						};
 					}
 					i += 1;
 				}
@@ -219,7 +262,9 @@ impl MultiMap {
 						let valsref = &aryref.vals[i];
 						let l2 = valsref.len();
 						for j in 0..l2 {
-							func(k, &valsref[j], i == l1 - 1 && j == l2 - 1);
+							if !func(k, &valsref[j], i == l1 - 1 && j == l2 - 1) {
+								break;
+							}
 						}
 					}
 				}
@@ -234,10 +279,11 @@ impl fmt::Debug for MultiMap {
 		write!(f, "MultiMap(")?;
 		self.each(|k, v, is_last| {
 			if is_last {
-				_ = write!(f, " {} = {}", k, v);
+				let _ = write!(f, " {} = {}", k, v);
 			} else {
-				_ = write!(f, " {} = {};", k, v);
+				let _ = write!(f, " {} = {};", k, v);
 			}
+			return true;
 		});
 		write!(f, ")")
 	}
