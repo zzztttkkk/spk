@@ -16,6 +16,8 @@ use tokio::time::sleep;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 use tokio_rustls::TlsAcceptor;
 
+use super::types::{AsyncReader, AsyncWriter};
+
 struct Tls {
 	cert: String,
 	key: String,
@@ -120,11 +122,14 @@ impl Server {
 		return self.shutdownhandler.clone();
 	}
 
-	pub async fn listen<Addr: PrintableToSocketAddrs>(
+	pub async fn listen<Addr: PrintableToSocketAddrs, R, W>(
 		&mut self,
 		addr: Addr,
-		h: Option<Box<dyn Handler + Send + Sync>>,
-	) {
+		h: Option<Arc<dyn Handler<R, W> + Send + Sync>>,
+	) where
+		R: AsyncReader,
+		W: AsyncWriter,
+	{
 		self.listener = Some(TcpListener::bind(addr).await.unwrap());
 
 		let mut tls_acceptor: Option<TlsAcceptor> = None;
@@ -145,15 +150,13 @@ impl Server {
 
 		let handler = match h {
 			Some(v) => v,
-			None => Box::new(FuncHandler::new(|req, _| {
+			None => Arc::new(FuncHandler::new(|req, _| {
 				Box::pin(async move {
 					println!("{req:?}");
 					Ok(())
 				})
 			})) as _,
 		};
-
-		let handler = Arc::new(Mutex::new(handler));
 
 		loop {
 			tokio::select! {

@@ -7,9 +7,6 @@ use std::net::SocketAddr;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
-use tokio::sync::Mutex;
-
-use super::ctx::Context;
 
 pub struct Conn<R: AsyncReader, W: AsyncWriter> {
 	addr: SocketAddr,
@@ -28,10 +25,9 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 		};
 	}
 
-	pub async fn as_server(&mut self, handler: Arc<Mutex<Box<dyn Handler + Send + Sync>>>) {
-		let mut req = Request::new();
-		let mut resp = Response::new();
-		let mut _ctx = Context::new(self);
+	pub async fn as_server(&mut self, handler: Arc<dyn Handler<R, W> + Send + Sync>) {
+		let mut req = Request::<R, W>::new();
+		let mut resp = Response::<R, W>::new();
 
 		loop {
 			match req.from(&mut self.r).await {
@@ -44,8 +40,7 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 				None => {}
 			}
 
-			let mut guard = handler.lock().await;
-			let result = (*guard).handle(&mut req, &mut resp).await;
+			let result = handler.handle(&mut req, &mut resp).await;
 			match result {
 				Ok(_) => {}
 				Err(e) => {

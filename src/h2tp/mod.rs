@@ -3,7 +3,6 @@ use tokio::sync::Mutex;
 
 mod cfg;
 mod conn;
-mod ctx;
 mod error;
 mod handler;
 mod headers;
@@ -11,7 +10,6 @@ mod message;
 mod methods;
 mod request;
 mod response;
-mod response_value;
 mod server;
 mod status_code;
 mod types;
