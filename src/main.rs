@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use std::io::Write;
-use std::sync::Arc;
 
 mod h2tp;
 mod json;
@@ -18,7 +17,7 @@ async fn main() {
 		server
 			.listen(
 				"127.0.0.1:8080",
-				Some(Arc::new(crate::func!(req, resp, {
+				Some(Box::new(crate::func!(req, resp, {
 					println!("{req:?}; Resp @ {resp:p}");
 
 					let mut respw = resp.builder();

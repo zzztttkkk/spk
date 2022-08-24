@@ -7,6 +7,7 @@ use std::net::SocketAddr;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::Mutex;
 
 pub struct Conn<R: AsyncReader, W: AsyncWriter> {
 	addr: SocketAddr,
@@ -25,7 +26,7 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 		};
 	}
 
-	pub async fn as_server(&mut self, handler: &mut dyn Handler) {
+	pub async fn as_server(&mut self, handler: Arc<Mutex<Box<dyn Handler + Send + Sync>>>) {
 		let mut req = Request::new();
 		let mut resp = Response::new();
 
@@ -40,7 +41,14 @@ impl<R: AsyncReader, W: AsyncWriter> Conn<R, W> {
 				None => {}
 			}
 
-			handler.handle(&mut req, &mut resp).await.unwrap();
+			let mut guard = handler.lock().await;
+			let result = (*guard).handle(&mut req, &mut resp).await;
+			match result {
+				Ok(_) => {}
+				Err(e) => {
+					println!("{:?}", e);
+				}
+			}
 
 			if self.server_is_closing.load(ATOMIC_ORDERING) {
 				return;

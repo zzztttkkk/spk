@@ -1,20 +1,20 @@
+use crate::h2tp::cfg::ATOMIC_ORDERING;
+use crate::h2tp::conn::Conn;
+use crate::h2tp::handler::Handler;
+use crate::h2tp::FuncHandler;
 use core::fmt;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::{Path};
-use std::sync::{Arc};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::Arc;
 use std::time::Duration;
-use tokio::net::{TcpListener};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio::net::TcpListener;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::Mutex;
 use tokio::time::sleep;
-use tokio_rustls::{TlsAcceptor};
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
-use crate::h2tp::conn::Conn;
-use crate::h2tp::cfg::ATOMIC_ORDERING;
-use crate::h2tp::FuncHandler;
-use crate::h2tp::handler::Handler;
+use tokio_rustls::TlsAcceptor;
 
 struct Tls {
 	cert: String,
@@ -24,28 +24,35 @@ struct Tls {
 impl Tls {
 	pub fn load(&self) -> ServerConfig {
 		let mut certs = Vec::new();
-		for e in rustls_pemfile::certs(
-			&mut BufReader::new(File::open(Path::new(self.cert.as_str())).unwrap())
-		).unwrap() {
+		for e in rustls_pemfile::certs(&mut BufReader::new(
+			File::open(Path::new(self.cert.as_str())).unwrap(),
+		))
+		.unwrap()
+		{
 			certs.push(Certificate(e));
 		}
 		let mut keys = Vec::new();
-		for e in rustls_pemfile::pkcs8_private_keys(
-			&mut BufReader::new(File::open(Path::new(self.key.as_str())).unwrap())
-		).unwrap() {
+		for e in rustls_pemfile::pkcs8_private_keys(&mut BufReader::new(
+			File::open(Path::new(self.key.as_str())).unwrap(),
+		))
+		.unwrap()
+		{
 			keys.push(PrivateKey(e));
 		}
 		if keys.is_empty() {
-			for e in rustls_pemfile::rsa_private_keys(
-				&mut BufReader::new(File::open(Path::new(self.key.as_str())).unwrap())
-			).unwrap() {
+			for e in rustls_pemfile::rsa_private_keys(&mut BufReader::new(
+				File::open(Path::new(self.key.as_str())).unwrap(),
+			))
+			.unwrap()
+			{
 				keys.push(PrivateKey(e));
 			}
 		}
 		return ServerConfig::builder()
 			.with_safe_defaults()
 			.with_no_client_auth()
-			.with_single_cert(certs, keys.remove(0)).unwrap();
+			.with_single_cert(certs, keys.remove(0))
+			.unwrap();
 	}
 }
 
@@ -56,7 +63,6 @@ pub struct Server {
 	shutdown_done_sender: UnboundedSender<()>,
 	shutdownhandler: Arc<Mutex<ShutdownHandler>>,
 }
-
 
 pub struct ShutdownHandler {
 	signal_sender: UnboundedSender<()>,
@@ -96,19 +102,29 @@ impl Server {
 			tls: None,
 			shutdown_signal_receiver: srx,
 			shutdown_done_sender: dtx,
-			shutdownhandler: Arc::new(Mutex::new(ShutdownHandler { signal_sender: stx, done_receiver: drx })),
+			shutdownhandler: Arc::new(Mutex::new(ShutdownHandler {
+				signal_sender: stx,
+				done_receiver: drx,
+			})),
 		};
 	}
 
 	pub fn tls(&mut self, cert: &str, key: &str) {
-		self.tls = Some(Tls { cert: cert.to_string(), key: key.to_string() });
+		self.tls = Some(Tls {
+			cert: cert.to_string(),
+			key: key.to_string(),
+		});
 	}
 
 	pub fn shutdownhandler(&self) -> Arc<Mutex<ShutdownHandler>> {
 		return self.shutdownhandler.clone();
 	}
 
-	pub async fn listen<Addr: PrintableToSocketAddrs>(&mut self, addr: Addr, h: Option<Arc<dyn Handler + Send + Sync>>) {
+	pub async fn listen<Addr: PrintableToSocketAddrs>(
+		&mut self,
+		addr: Addr,
+		h: Option<Box<dyn Handler + Send + Sync>>,
+	) {
 		self.listener = Some(TcpListener::bind(addr).await.unwrap());
 
 		let mut tls_acceptor: Option<TlsAcceptor> = None;
@@ -128,18 +144,16 @@ impl Server {
 		let lref = self.listener.as_ref().unwrap();
 
 		let handler = match h {
-			Some(v) => {
-				v
-			}
-			None => {
-				Arc::new(FuncHandler::new(|req, _| {
-					Box::pin(async move {
-						println!("{req:?}");
-						Ok(())
-					})
-				})) as _
-			}
+			Some(v) => v,
+			None => Box::new(FuncHandler::new(|req, _| {
+				Box::pin(async move {
+					println!("{req:?}");
+					Ok(())
+				})
+			})) as _,
 		};
+
+		let handler = Arc::new(Mutex::new(handler));
 
 		loop {
 			tokio::select! {
