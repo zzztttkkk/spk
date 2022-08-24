@@ -1,24 +1,21 @@
 use crate::h2tp::cfg::MESSAGE_BUFFER_SIZE;
+use crate::h2tp::headers;
 use crate::h2tp::headers::Headers;
-use crate::h2tp::{headers, types};
 use bytes::BytesMut;
 use std::fmt;
 use std::fmt::Formatter;
 use std::io::ErrorKind;
 use tokio::io::AsyncReadExt;
 
-use super::conn::Conn;
-use super::types::{AsyncReader, AsyncWriter};
+use super::types::AsyncReader;
 
-pub struct Message<'c, R: AsyncReader, W: AsyncWriter> {
+pub struct Message {
 	pub(crate) startline: (String, String, String),
 	pub(crate) headers: Option<Headers>,
 	pub(crate) body: Option<BytesMut>,
 	buf: Option<BytesMut>,
 	bufsize: usize,
 	bufremains: usize,
-
-	conn: Option<&'c Conn<R, W>>,
 }
 
 #[derive(PartialEq)]
@@ -91,11 +88,7 @@ impl fmt::Debug for ParseError {
 
 const BAD_REQUEST: &str = "bad request";
 
-impl<'c, R, W> Message<'c, R, W>
-where
-	R: AsyncReader,
-	W: AsyncWriter,
-{
+impl Message {
 	pub(crate) fn new() -> Self {
 		return Self {
 			startline: (String::new(), String::new(), String::new()),
@@ -104,12 +97,7 @@ where
 			buf: None,
 			bufsize: 0,
 			bufremains: 0,
-			conn: None,
 		};
-	}
-
-	pub(crate) fn setconn(&mut self, c: &'c Conn<R, W>) {
-		self.conn = Some(c);
 	}
 
 	pub(crate) fn clear(&mut self) {
@@ -132,7 +120,7 @@ where
 		}
 	}
 
-	pub(crate) async fn read(&mut self, stream: &mut R) -> Option<ParseError> {
+	pub(crate) async fn read(&mut self, stream: &mut dyn AsyncReader) -> Option<ParseError> {
 		if self.bufremains > 0 {
 			return None;
 		}
@@ -154,7 +142,7 @@ where
 
 	pub(crate) async fn read_sized_body(
 		&mut self,
-		stream: &mut R,
+		stream: &mut dyn AsyncReader,
 		cl: usize,
 	) -> Option<ParseError> {
 		if cl == 0 {
@@ -191,7 +179,10 @@ where
 		return None;
 	}
 
-	pub(crate) async fn read_byte(&mut self, stream: &mut R) -> Result<u8, ParseError> {
+	pub(crate) async fn read_byte(
+		&mut self,
+		stream: &mut dyn AsyncReader,
+	) -> Result<u8, ParseError> {
 		let bufref = self.buf.as_mut().unwrap().as_mut();
 
 		let c: u8;
@@ -211,7 +202,10 @@ where
 		return Ok(c);
 	}
 
-	pub(crate) async fn read_chunked_body(&mut self, stream: &mut R) -> Option<ParseError> {
+	pub(crate) async fn read_chunked_body(
+		&mut self,
+		stream: &mut dyn AsyncReader,
+	) -> Option<ParseError> {
 		let mut current_chunk_size: Option<usize> = None;
 		let mut numbuf = String::new();
 		let mut skip_newline = false;
@@ -292,7 +286,7 @@ where
 		return None;
 	}
 
-	pub(crate) async fn read_body(&mut self, stream: &mut R) -> Option<ParseError> {
+	pub(crate) async fn read_body(&mut self, stream: &mut dyn AsyncReader) -> Option<ParseError> {
 		let mut cl: Option<usize> = None;
 		match &self.headers {
 			Some(href) => {
@@ -339,7 +333,7 @@ where
 		return None;
 	}
 
-	pub(crate) async fn from(&mut self, stream: &mut R) -> Option<ParseError> {
+	pub(crate) async fn from(&mut self, stream: &mut dyn AsyncReader) -> Option<ParseError> {
 		if self.buf.is_none() {
 			let mut buf = BytesMut::with_capacity(MESSAGE_BUFFER_SIZE);
 			unsafe {

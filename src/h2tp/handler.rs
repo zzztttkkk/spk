@@ -5,35 +5,26 @@ use std::future::Future;
 use std::pin::Pin;
 
 type BoxedFuture<'a> = Pin<Box<dyn Future<Output = Result<(), Error>> + Send + 'a>>;
-type FuncType<R, W> =
-	for<'a> fn(req: &'a mut Request<R, W>, resp: &'a mut Response<R, W>) -> BoxedFuture<'a>;
+type FuncType = for<'a> fn(req: &'a mut Request, resp: &'a mut Response) -> BoxedFuture<'a>;
 
-pub trait Handler<R, W> {
-	fn handle<'a>(
-		&self,
-		req: &'a mut Request<'a, R, W>,
-		resp: &'a mut Response<'a, R, W>,
-	) -> BoxedFuture<'a>;
+pub trait Handler {
+	fn handle<'a>(&self, req: &'a mut Request, resp: &'a mut Response) -> BoxedFuture<'a>;
 }
 
-pub struct FuncHandler<R, W> {
-	f: FuncType<R, W>,
+pub struct FuncHandler {
+	f: FuncType,
 }
 
-impl<R, W> FuncHandler<R, W> {
+impl FuncHandler {
 	#[inline]
-	pub fn new(f: FuncType<R, W>) -> Self {
+	pub fn new(f: FuncType) -> Self {
 		return Self { f };
 	}
 }
 
-impl<R, W> Handler<R, W> for FuncHandler<R, W> {
+impl Handler for FuncHandler {
 	#[inline]
-	fn handle<'a>(
-		&self,
-		req: &'a mut Request<R, W>,
-		resp: &'a mut Response<R, W>,
-	) -> BoxedFuture<'a> {
+	fn handle<'a>(&self, req: &'a mut Request, resp: &'a mut Response) -> BoxedFuture<'a> {
 		(self.f)(req, resp)
 	}
 }

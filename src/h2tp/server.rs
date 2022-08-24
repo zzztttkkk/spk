@@ -16,8 +16,6 @@ use tokio::time::sleep;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 use tokio_rustls::TlsAcceptor;
 
-use super::types::{AsyncReader, AsyncWriter};
-
 struct Tls {
 	cert: String,
 	key: String,
@@ -122,14 +120,11 @@ impl Server {
 		return self.shutdownhandler.clone();
 	}
 
-	pub async fn listen<Addr: PrintableToSocketAddrs, R, W>(
+	pub async fn listen<Addr: PrintableToSocketAddrs>(
 		&mut self,
 		addr: Addr,
-		h: Option<Arc<dyn Handler<R, W> + Send + Sync>>,
-	) where
-		R: AsyncReader,
-		W: AsyncWriter,
-	{
+		h: Option<Arc<dyn Handler + Send + Sync>>,
+	) {
 		self.listener = Some(TcpListener::bind(addr).await.unwrap());
 
 		let mut tls_acceptor: Option<TlsAcceptor> = None;
@@ -162,7 +157,7 @@ impl Server {
 			tokio::select! {
 				result = lref.accept() => {
 					match result {
-						Ok((mut stream, addr)) => {
+						Ok((stream, addr)) => {
 							let accc = Arc::clone(&alive_conn_count);
 							let cc = Arc::clone(&closing);
 							let hc = Arc::clone(&handler);
@@ -174,10 +169,8 @@ impl Server {
 										match acceptor.accept(stream).await {
 											Ok(tls_stream) => {
 												accc.fetch_add(1, ATOMIC_ORDERING);
-												// https://github.com/rustls/rustls/issues/288
-												// https://github.com/tokio-rs/tokio/issues/1108
-												let (r, w) = tokio::io::split(tls_stream);
-												let mut conn = Conn::new(addr, r, w, cc);
+							
+												let mut conn = Conn::newservtls(addr, tls_stream, cc);
 												conn.as_server(hc).await;
 												accc.fetch_sub(1, ATOMIC_ORDERING);
 											}
@@ -188,8 +181,7 @@ impl Server {
 								None=>{
 									tokio::spawn(async move {
 										accc.fetch_add(1, ATOMIC_ORDERING);
-										let (r, w) = stream.split();
-										let mut conn = Conn::new(addr, r, w, cc);
+										let mut conn = Conn::new(addr, stream, cc);
 										conn.as_server(hc).await;
 										accc.fetch_sub(1, ATOMIC_ORDERING);
 									});

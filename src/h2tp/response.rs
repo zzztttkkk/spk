@@ -8,12 +8,12 @@ pub enum RespBody {
 	SyncStream(Box<dyn Read + Send>),
 }
 
-pub struct Response<'c, R, W> {
-	msg: Message<'c, R, W>,
+pub struct Response {
+	msg: Message,
 	body: Option<RespBody>,
 }
 
-impl<'c, R, W> Response<'c, R, W> {
+impl Response {
 	pub fn new() -> Self {
 		return Response {
 			msg: Message::new(),

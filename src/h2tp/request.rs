@@ -3,13 +3,13 @@ use crate::h2tp::message::{Message, ParseError};
 use bytes::BytesMut;
 use std::fmt;
 
-use super::types::{AsyncReader, AsyncWriter};
+use super::types::AsyncReader;
 
-pub struct Request<'c, R: AsyncReader, W: AsyncWriter> {
-	msg: Message<'c, R, W>,
+pub struct Request {
+	msg: Message,
 }
 
-impl<'c, R: AsyncReader, W: AsyncWriter> fmt::Debug for Request<'c, R, W> {
+impl fmt::Debug for Request {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		write!(
 			f,
@@ -22,11 +22,7 @@ impl<'c, R: AsyncReader, W: AsyncWriter> fmt::Debug for Request<'c, R, W> {
 	}
 }
 
-impl<'c, R, W> Request<'c, R, W>
-where
-	R: AsyncReader,
-	W: AsyncWriter,
-{
+impl Request {
 	pub fn new() -> Self {
 		return Self {
 			msg: Message::new(),
@@ -37,7 +33,7 @@ where
 		self.msg.clear();
 	}
 
-	pub async fn from(&mut self, stream: &mut R) -> Option<ParseError> {
+	pub async fn from(&mut self, stream: &mut dyn AsyncReader) -> Option<ParseError> {
 		return self.msg.from(stream).await;
 	}
 
