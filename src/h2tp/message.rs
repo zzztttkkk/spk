@@ -17,6 +17,8 @@ pub struct Message {
 	pub(crate) headers: Option<Headers>,
 	pub(crate) body: Option<BytesMut>,
 	pub(crate) remote: Option<SocketAddr>,
+	/// for `Request`, `buf` is the read buffer.
+	/// for `Response`, `buf` is the write buffer.
 	buf: Option<BytesMut>,
 	bufsize: usize,
 	bufremains: usize,

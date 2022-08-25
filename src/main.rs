@@ -1,12 +1,23 @@
 #![allow(dead_code)]
 
-use std::sync::Arc;
 use std::io::Write;
+use std::sync::Arc;
 
 mod h2tp;
 
+use ini::HelloMacro;
+
+pub trait HelloMacro {
+	fn hello_macro();
+}
+
+#[derive(HelloMacro)]
+struct X {}
+
 #[tokio::main]
 async fn main() {
+	X::hello_macro();
+
 	let mut server = h2tp::server();
 
 	// server.tls("./dist/spk.local.pem", "./dist/spk.local-key.pem");

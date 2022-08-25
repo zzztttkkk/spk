@@ -54,6 +54,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ini"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.59"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -265,6 +273,7 @@ name = "spk"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "ini",
  "rustls-pemfile",
  "tokio",
  "tokio-rustls",
