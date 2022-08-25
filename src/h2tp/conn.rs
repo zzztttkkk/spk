@@ -1,4 +1,3 @@
-use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
 use crate::h2tp::cfg::ATOMIC_ORDERING;
@@ -93,6 +92,8 @@ impl Conn {
 	// https://github.com/tokio-rs/tokio/issues/1108
 	pub async fn as_server(&mut self, handler: Arc<dyn Handler + Send + Sync>) {
 		let mut req = Request::new();
+		req.msg.remote = Some(self.addr);
+
 		let mut resp = Response::new();
 		let cc = self.server_is_closing.clone();
 
@@ -123,9 +124,7 @@ impl Conn {
 				return;
 			}
 
-			w.write(b"HTTP/1.0 200 OK\r\nContent-Length: 11\r\n\r\nHello World")
-				.await
-				.err();
+			resp.msg.to(w).await;
 
 			req.clear();
 			resp.clear();

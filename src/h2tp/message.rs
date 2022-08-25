@@ -4,15 +4,19 @@ use crate::h2tp::headers::Headers;
 use bytes::BytesMut;
 use std::fmt;
 use std::fmt::Formatter;
+use std::fmt::Write;
 use std::io::ErrorKind;
+use std::net::SocketAddr;
 use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
 
-use super::types::AsyncReader;
+use super::types::{AsyncReader, AsyncWriter};
 
 pub struct Message {
 	pub(crate) startline: (String, String, String),
 	pub(crate) headers: Option<Headers>,
 	pub(crate) body: Option<BytesMut>,
+	pub(crate) remote: Option<SocketAddr>,
 	buf: Option<BytesMut>,
 	bufsize: usize,
 	bufremains: usize,
@@ -97,6 +101,7 @@ impl Message {
 			buf: None,
 			bufsize: 0,
 			bufremains: 0,
+			remote: None,
 		};
 	}
 
@@ -119,7 +124,9 @@ impl Message {
 			None => {}
 		}
 	}
+}
 
+impl Message {
 	pub(crate) async fn read(&mut self, stream: &mut dyn AsyncReader) -> Option<ParseError> {
 		if self.bufremains > 0 {
 			return None;
@@ -333,7 +340,7 @@ impl Message {
 		return None;
 	}
 
-	pub(crate) async fn from(&mut self, stream: &mut dyn AsyncReader) -> Option<ParseError> {
+	fn ensurebuf(&mut self) {
 		if self.buf.is_none() {
 			let mut buf = BytesMut::with_capacity(MESSAGE_BUFFER_SIZE);
 			unsafe {
@@ -341,6 +348,10 @@ impl Message {
 			}
 			self.buf = Some(buf);
 		}
+	}
+
+	pub(crate) async fn from(&mut self, stream: &mut dyn AsyncReader) -> Option<ParseError> {
+		self.ensurebuf();
 		let mut status: ParseStatus = ParseStatus::Empty;
 		let mut skip_newline = false;
 		let mut hkey = String::new();
@@ -447,5 +458,81 @@ impl Message {
 			self.headers = Some(Headers::new());
 		}
 		return self.headers.as_mut().unwrap().builder();
+	}
+}
+
+impl Message {
+	pub(crate) async fn to(&mut self, stream: &mut dyn AsyncWriter) {
+		self.ensurebuf();
+		let bufref = self.buf.as_mut().unwrap();
+		bufref.clear();
+
+		macro_rules! writesl {
+			($idx:tt, $dv:expr) => {
+				if self.startline.$idx.is_empty() {
+					let _ = bufref.write_str($dv);
+				} else {
+					let _ = bufref.write_str(self.startline.$idx.as_str());
+				}
+			};
+		}
+
+		macro_rules! writestr {
+			($v:expr) => {
+				let _ = bufref.write_str($v);
+			};
+		}
+
+		writesl!(0, "HTTP/1.1");
+		writestr!(" ");
+		writesl!(1, "200");
+		writestr!(" ");
+		writesl!(2, "OK");
+		writestr!("\r\n");
+
+		let mut content_length: usize = 0;
+		match self.body.as_ref() {
+			Some(body) => {
+				content_length = body.len();
+			}
+			None => {}
+		}
+
+		match self.headers.as_mut() {
+			Some(headers) => {
+				headers.builder().content_length(content_length);
+
+				headers.m.each(|k, v, _| {
+					writestr!(k);
+					writestr!(": ");
+					writestr!(v);
+					writestr!("\r\n");
+					return true;
+				});
+			}
+			None => {
+				if content_length > 0 {
+					writestr!("content-length: ");
+					writestr!(content_length.to_string().as_str());
+					writestr!("\r\n");
+				}
+			}
+		}
+		writestr!("\r\n");
+
+		if content_length < 1 {
+			let _ = stream.write(bufref).await;
+		} else {
+			let body = self.body.as_mut().unwrap();
+			if content_length < 4096 {
+				bufref.extend_from_slice(body);
+				let _ = stream.write(bufref).await;
+			} else {
+				let _ = stream.write(bufref).await;
+				let _ = stream.write(body).await;
+			}
+		}
+
+		let _ = stream.flush().await;
 	}
 }

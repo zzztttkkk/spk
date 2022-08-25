@@ -19,6 +19,7 @@ async fn main() {
 				"127.0.0.1:8080",
 				Some(Arc::new(crate::func!(req, resp, {
 					println!("{req:?}; Resp @ {resp:p}");
+					resp.write("Hello World!");
 					return Ok(());
 				}))),
 			)

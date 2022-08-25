@@ -68,7 +68,7 @@ pub mod mime {
 }
 
 pub struct Headers {
-	m: MultiMap,
+	pub(crate) m: MultiMap,
 }
 
 pub struct Builder<'h> {
