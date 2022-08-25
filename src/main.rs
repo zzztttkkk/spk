@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 mod h2tp;
-mod json;
 
 #[tokio::main]
 async fn main() {
