@@ -112,13 +112,7 @@ impl Conn {
 				None => {}
 			}
 
-			let result = handler.handle(&mut req, &mut resp).await;
-			match result {
-				Ok(_) => {}
-				Err(e) => {
-					println!("{:?}", e);
-				}
-			}
+			handler.handle(&mut req, &mut resp).await;
 
 			if cc.load(ATOMIC_ORDERING) {
 				return;

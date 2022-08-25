@@ -1,14 +1,9 @@
 use bytes::BytesMut;
 
 use crate::h2tp::message::Message;
-use crate::h2tp::types::AsyncReader;
-use std::fmt::Write;
-use std::io::Read;
 
 pub enum RespBody {
 	File(String),
-	AsyncStream(Box<dyn AsyncReader + Send>),
-	SyncStream(Box<dyn Read + Send>),
 }
 
 pub struct Response {
@@ -29,12 +24,43 @@ impl Response {
 		self.body = None;
 	}
 
-	pub fn write(&mut self, val: &str) {
+	pub fn resetbody(&mut self) {
+		self.body = None;
+		match self.msg.body.as_mut() {
+			Some(body) => {
+				body.clear();
+			}
+			None => {}
+		}
+	}
+
+	fn ensure_msg_bodybuf(&mut self) -> &mut BytesMut {
+		if self.body.is_some() {
+			panic!("Response's body is some, call `resetbody` first");
+		}
 		if self.msg.body.is_none() {
 			self.msg.body = Some(BytesMut::new());
 		}
+		return self.msg.body.as_mut().unwrap();
+	}
+}
 
-		let bodyref = self.msg.body.as_mut().unwrap();
-		let _ = bodyref.write_str(val);
+impl std::io::Write for Response {
+	fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+		let body = self.ensure_msg_bodybuf();
+		body.extend_from_slice(buf);
+		Ok(buf.len())
+	}
+
+	fn flush(&mut self) -> std::io::Result<()> {
+		Ok(())
+	}
+}
+
+
+impl std::fmt::Write for Response {
+	fn write_str(&mut self, s: &str) -> std::fmt::Result {
+		let buf = self.ensure_msg_bodybuf();
+		buf.write_str(s)
 	}
 }

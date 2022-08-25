@@ -148,7 +148,6 @@ impl Server {
 			None => Arc::new(FuncHandler::new(|req, _| {
 				Box::pin(async move {
 					println!("{req:?}");
-					Ok(())
 				})
 			})) as _,
 		};
