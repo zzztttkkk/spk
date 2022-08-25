@@ -2,8 +2,9 @@ use crate::h2tp::request::Request;
 use crate::h2tp::response::Response;
 use std::future::Future;
 use std::pin::Pin;
+use std::rc::Rc;
 
-type BoxedFuture<'a> = Pin<Box<dyn Future<Output=()> + Send + 'a>>;
+type BoxedFuture<'a> = Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
 
 pub trait Handler {
 	fn handle<'a>(&self, req: &'a mut Request, resp: &'a mut Response) -> BoxedFuture<'a>;
@@ -15,24 +16,40 @@ pub enum RouterRegisterResult {
 }
 
 pub trait Router {
-	fn register(&mut self, pattern: &str, handler: Box<dyn Handler>) -> Result<(), RouterRegisterResult>;
+	fn register(
+		&mut self,
+		pattern: &str,
+		handler: Box<dyn Handler>,
+	) -> Result<(), RouterRegisterResult>;
 	fn find<'a>(&self, req: &'a Request) -> Option<&dyn Handler>;
 }
 
-impl<T> Handler for T where T: Router {
+thread_local! {
+	static NOT_FOUND_HANDLER: Rc<dyn Handler> = Rc::new(
+		FuncHandler::new(
+			|_, response: &mut Response| {
+				Box::pin(async move {
+					response.msg.startline.1 = "404".to_string();
+					response.msg.startline.2 = "Not Found".to_string();
+				})
+			}
+		)
+	);
+}
+
+impl<T> Handler for T
+where
+	T: Router,
+{
 	fn handle<'a>(&self, req: &'a mut Request, resp: &'a mut Response) -> BoxedFuture<'a> {
 		match self.find(req) {
-			Some(handler) => {
-				handler.handle(req, resp)
-			}
+			Some(handler) => handler.handle(req, resp),
 			None => {
-				let handler = FuncHandler::new(|_, response: &mut Response| {
-					Box::pin(async move {
-						response.msg.startline.1 = "404".to_string();
-						response.msg.startline.2 = "Not Found".to_string();
-					})
+				let mut handler: Option<Rc<dyn Handler>> = None;
+				NOT_FOUND_HANDLER.with(|h| {
+					handler = Some(h.clone());
 				});
-				handler.handle(req, resp)
+				handler.as_ref().unwrap().handle(req, resp)
 			}
 		}
 	}
