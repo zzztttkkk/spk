@@ -94,6 +94,7 @@ impl<'a> Future for MiddlewareRunning<'a> {
 						Poll::Ready(out) => {
 							match out {
 								Control::Continue => {
+									self.idx += 1;
 									Poll::Pending
 								}
 								Control::Break => {
@@ -103,12 +104,11 @@ impl<'a> Future for MiddlewareRunning<'a> {
 						}
 					};
 				}
-				None => {}
+				None => {
+					let current = self.vec[self.idx].as_ref();
+					self.future = Some(current.handle(self.req, self.resp));
+				}
 			}
-
-			let current = self.vec[self.idx].as_ref();
-			self.future = Some(current.handle(self.req, self.resp));
-			return Poll::Pending;
 		}
 	}
 }
