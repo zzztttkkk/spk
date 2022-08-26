@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 use tokio_rustls::TlsAcceptor;
+use std::fmt::Write;
 
 struct Tls {
 	cert: String,
@@ -27,7 +28,7 @@ impl Tls {
 		for e in rustls_pemfile::certs(&mut BufReader::new(
 			File::open(Path::new(self.cert.as_str())).unwrap(),
 		))
-		.unwrap()
+			.unwrap()
 		{
 			certs.push(Certificate(e));
 		}
@@ -35,7 +36,7 @@ impl Tls {
 		for e in rustls_pemfile::pkcs8_private_keys(&mut BufReader::new(
 			File::open(Path::new(self.key.as_str())).unwrap(),
 		))
-		.unwrap()
+			.unwrap()
 		{
 			keys.push(PrivateKey(e));
 		}
@@ -43,7 +44,7 @@ impl Tls {
 			for e in rustls_pemfile::rsa_private_keys(&mut BufReader::new(
 				File::open(Path::new(self.key.as_str())).unwrap(),
 			))
-			.unwrap()
+				.unwrap()
 			{
 				keys.push(PrivateKey(e));
 			}
@@ -145,9 +146,10 @@ impl Server {
 
 		let handler = match h {
 			Some(v) => v,
-			None => Arc::new(FuncHandler::new(|req, _| {
+			None => Arc::new(FuncHandler::new(|req, resp| {
 				Box::pin(async move {
-					println!("{req:?}");
+					println!("{:?}", req);
+					let _ = resp.write_str("Hello World~");
 				})
 			})) as _,
 		};
