@@ -63,10 +63,6 @@ impl<'a> Future for MiddlewareRunning<'a> {
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		loop {
-			if self.idx >= self.vec.len() {
-				return Poll::Ready(());
-			}
-
 			match self.future.as_mut() {
 				Some(f) => {
 					return match Pin::new(f).poll(cx) {
@@ -77,6 +73,9 @@ impl<'a> Future for MiddlewareRunning<'a> {
 							match out {
 								Control::Continue => {
 									self.idx += 1;
+									if self.idx >= self.vec.len() {
+										return Poll::Ready(());
+									}
 									Poll::Pending
 								}
 								Control::Break => {
