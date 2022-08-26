@@ -2,7 +2,6 @@ use crate::h2tp::request::Request;
 use crate::h2tp::response::Response;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{Context, Poll};
 
 pub type HandlerFuture<'a> = Pin<Box<dyn Future<Output=()> + Send + 'a>>;
 
