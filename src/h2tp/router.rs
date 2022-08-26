@@ -94,7 +94,7 @@ impl<'a> Future for MiddlewareRunningFuture<'a> {
 	}
 }
 
-enum RouterHandleRunningStatus {
+enum RouterRunningStatus {
 	Init,
 	Before,
 	After,
@@ -103,7 +103,7 @@ enum RouterHandleRunningStatus {
 }
 
 pub struct RouterRunningFuture<'a> {
-	status: RouterHandleRunningStatus,
+	status: RouterRunningStatus,
 	router: &'a dyn Router,
 	req: &'a mut Request,
 	resp: &'a mut Response,
@@ -117,7 +117,7 @@ impl<'a> RouterRunningFuture<'a> {
 			router,
 			req,
 			resp,
-			status: RouterHandleRunningStatus::Init,
+			status: RouterRunningStatus::Init,
 			handler: None,
 			future: None,
 		};
@@ -128,7 +128,7 @@ impl<'a> Future for RouterRunningFuture<'a> {
 	type Output = ();
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		use RouterHandleRunningStatus as Status;
+		use RouterRunningStatus as Status;
 
 		loop {
 			match self.status {
