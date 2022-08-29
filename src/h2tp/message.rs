@@ -6,17 +6,17 @@ use std::fmt;
 use std::fmt::Formatter;
 use std::fmt::Write;
 use std::io::ErrorKind;
-use std::net::SocketAddr;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 
+use super::conn::ConnStatus;
 use super::types::{AsyncReader, AsyncWriter};
 
-pub struct Message {
+pub struct Message<'c> {
 	pub(crate) startline: (String, String, String),
 	pub(crate) headers: Option<Headers>,
 	pub(crate) body: Option<BytesMut>,
-	pub(crate) remote: Option<SocketAddr>,
+	pub(crate) conn: Option<&'c ConnStatus>,
 	/// for `Request`, `buf` is the read buffer.
 	/// for `Response`, `buf` is the write buffer.
 	buf: Option<BytesMut>,
@@ -94,16 +94,16 @@ impl fmt::Debug for ParseError {
 
 const BAD_REQUEST: &str = "bad request";
 
-impl Message {
+impl<'c> Message<'c> {
 	pub(crate) fn new() -> Self {
 		return Self {
 			startline: (String::new(), String::new(), String::new()),
 			headers: None,
 			body: None,
 			buf: None,
+			conn: None,
 			bufsize: 0,
 			bufremains: 0,
-			remote: None,
 		};
 	}
 
@@ -128,7 +128,7 @@ impl Message {
 	}
 }
 
-impl Message {
+impl<'c> Message<'c> {
 	pub(crate) async fn read(&mut self, stream: &mut dyn AsyncReader) -> Option<ParseError> {
 		if self.bufremains > 0 {
 			return None;
@@ -463,7 +463,7 @@ impl Message {
 	}
 }
 
-impl Message {
+impl<'c> Message<'c> {
 	pub(crate) async fn to(&mut self, stream: &mut dyn AsyncWriter) {
 		self.ensurebuf();
 		let bufref = self.buf.as_mut().unwrap();

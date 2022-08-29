@@ -5,11 +5,11 @@ use std::fmt;
 
 use super::types::AsyncReader;
 
-pub struct Request {
-	pub(crate) msg: Message,
+pub struct Request<'c> {
+	pub(crate) msg: Message<'c>,
 }
 
-impl fmt::Debug for Request {
+impl<'c> fmt::Debug for Request<'c> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		write!(f, "Request <")?;
 
@@ -22,9 +22,9 @@ impl fmt::Debug for Request {
 			self,
 		)?;
 
-		match self.msg.remote.as_ref() {
-			Some(addr) => {
-				write!(f, " <- {}", addr)?;
+		match self.msg.conn {
+			Some(conn) => {
+				write!(f, " <- {}", conn.addr)?;
 			}
 			None => {}
 		}
@@ -33,7 +33,7 @@ impl fmt::Debug for Request {
 	}
 }
 
-impl Request {
+impl<'c> Request<'c> {
 	pub fn new() -> Self {
 		return Self {
 			msg: Message::new(),

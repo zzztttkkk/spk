@@ -6,12 +6,12 @@ pub enum RespBody {
 	File(String),
 }
 
-pub struct Response {
-	pub(crate) msg: Message,
+pub struct Response<'c> {
+	pub(crate) msg: Message<'c>,
 	pub(crate) body: Option<RespBody>,
 }
 
-impl Response {
+impl<'c> Response<'c> {
 	pub fn new() -> Self {
 		return Response {
 			msg: Message::new(),
@@ -45,7 +45,7 @@ impl Response {
 	}
 }
 
-impl std::io::Write for Response {
+impl<'c> std::io::Write for Response<'c> {
 	fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
 		let body = self.ensure_msg_bodybuf();
 		body.extend_from_slice(buf);
@@ -57,8 +57,7 @@ impl std::io::Write for Response {
 	}
 }
 
-
-impl std::fmt::Write for Response {
+impl<'c> std::fmt::Write for Response<'c> {
 	fn write_str(&mut self, s: &str) -> std::fmt::Result {
 		let buf = self.ensure_msg_bodybuf();
 		buf.write_str(s)

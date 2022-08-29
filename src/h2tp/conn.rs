@@ -18,6 +18,16 @@ pub struct Conn {
 	clitlsstream: Option<CliTlsStream>,
 }
 
+pub(crate) struct ConnStatus {
+	pub(crate) addr: SocketAddr,
+}
+
+impl ConnStatus {
+	fn new(conn: &Conn) -> Self {
+		return Self { addr: conn.addr };
+	}
+}
+
 impl Conn {
 	pub fn newservtls(
 		addr: SocketAddr,
@@ -91,8 +101,10 @@ impl Conn {
 	// https://github.com/rustls/rustls/issues/288
 	// https://github.com/tokio-rs/tokio/issues/1108
 	pub async fn as_server(&mut self, handler: Arc<dyn Handler>) {
+		let status = ConnStatus::new(self);
+
 		let mut req = Request::new();
-		req.msg.remote = Some(self.addr);
+		req.msg.conn = Some(&status);
 
 		let mut resp = Response::new();
 		let cc = self.server_is_closing.clone();

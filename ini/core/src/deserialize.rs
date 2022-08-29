@@ -5,5 +5,5 @@ impl Parser {
 		return Self {};
 	}
 
-	fn feed(&mut self, c: char) {}
+	fn feed(&mut self, _c: char) {}
 }
