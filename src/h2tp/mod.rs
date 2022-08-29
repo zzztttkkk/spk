@@ -15,7 +15,6 @@ mod status_code;
 mod types;
 mod url;
 mod utils;
-mod router;
 
 pub async fn shutdown(handler: &Arc<Mutex<server::ShutdownHandler>>, timout: u64) {
 	let mut guard = handler.lock().await;

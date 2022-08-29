@@ -3,9 +3,9 @@ use crate::h2tp::response::Response;
 use std::future::Future;
 use std::pin::Pin;
 
-pub type HandlerFuture<'a> = Pin<Box<dyn Future<Output=()> + Send + 'a>>;
+pub type HandlerFuture<'a> = Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
 
-pub trait Handler {
+pub trait Handler: Send + Sync {
 	fn handle<'a>(&self, req: &'a mut Request, resp: &'a mut Response) -> HandlerFuture<'a>;
 }
 

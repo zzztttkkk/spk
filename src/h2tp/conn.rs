@@ -90,7 +90,7 @@ impl Conn {
 
 	// https://github.com/rustls/rustls/issues/288
 	// https://github.com/tokio-rs/tokio/issues/1108
-	pub async fn as_server(&mut self, handler: Arc<dyn Handler + Send + Sync>) {
+	pub async fn as_server(&mut self, handler: Arc<dyn Handler>) {
 		let mut req = Request::new();
 		req.msg.remote = Some(self.addr);
 

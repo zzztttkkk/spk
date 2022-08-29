@@ -3,6 +3,7 @@ use crate::h2tp::conn::Conn;
 use crate::h2tp::handler::Handler;
 use crate::h2tp::FuncHandler;
 use core::fmt;
+use std::fmt::Write;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -15,7 +16,6 @@ use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 use tokio_rustls::TlsAcceptor;
-use std::fmt::Write;
 
 struct Tls {
 	cert: String,
@@ -28,7 +28,7 @@ impl Tls {
 		for e in rustls_pemfile::certs(&mut BufReader::new(
 			File::open(Path::new(self.cert.as_str())).unwrap(),
 		))
-			.unwrap()
+		.unwrap()
 		{
 			certs.push(Certificate(e));
 		}
@@ -36,7 +36,7 @@ impl Tls {
 		for e in rustls_pemfile::pkcs8_private_keys(&mut BufReader::new(
 			File::open(Path::new(self.key.as_str())).unwrap(),
 		))
-			.unwrap()
+		.unwrap()
 		{
 			keys.push(PrivateKey(e));
 		}
@@ -44,7 +44,7 @@ impl Tls {
 			for e in rustls_pemfile::rsa_private_keys(&mut BufReader::new(
 				File::open(Path::new(self.key.as_str())).unwrap(),
 			))
-				.unwrap()
+			.unwrap()
 			{
 				keys.push(PrivateKey(e));
 			}
@@ -124,7 +124,7 @@ impl Server {
 	pub async fn listen<Addr: PrintableToSocketAddrs>(
 		&mut self,
 		addr: Addr,
-		h: Option<Arc<dyn Handler + Send + Sync>>,
+		h: Option<Arc<dyn Handler>>,
 	) {
 		self.listener = Some(TcpListener::bind(addr).await.unwrap());
 
