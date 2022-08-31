@@ -33,6 +33,8 @@ pub fn server() -> server::Server {
 pub use handler::FuncHandler;
 pub use request::Request;
 pub use response::Response;
+pub use methods::*;
+pub use headers::hns;
 
 #[macro_export]
 macro_rules! func {
