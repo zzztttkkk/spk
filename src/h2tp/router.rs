@@ -1,119 +1,78 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::time::Duration;
+use async_trait::async_trait;
 
 use crate::h2tp::{Request, Response};
-use crate::h2tp::handler::{Handler, HandlerFuture};
+use crate::h2tp::handler::{Handler};
 
 pub enum MiddlewareControl {
 	Continue,
 	Break,
+	Return,
 }
 
-pub type MiddlewareFuture<'a> = Pin<Box<dyn Future<Output=MiddlewareControl> + Send + 'a>>;
-
+/// `Middleware` will return by the `Router`, then be called one by one in `Router.handle`.
+#[async_trait]
 pub trait Middleware: Send + Sync {
-	fn handle<'a, 'c>(&self, req: &'a mut Request<'c>, resp: &'a mut Response<'c>) -> MiddlewareFuture;
+	/// `handle` take `req` and `resp`, return a `MiddlewareControl`.
+	/// - if return `::Continue`, the loop of middleware group call will continue;
+	/// - if return `::Break`, the loop of middleware group call will break;
+	/// - if return `::Return`, the loop of middleware group call will break and
+	/// the `Router.handle` will return, and the `handler` which returned by `Router.find` will not execute;
+	async fn handle<'a, 'c>(&self, req: &'a mut Request<'c>, resp: &'a mut Response<'c>) -> MiddlewareControl;
 }
 
-struct MiddlewareExecutor<'a, 'c, 'r: 'a> {
-	req: &'a mut Request<'c>,
-	resp: &'a mut Response<'c>,
-	vec: &'r Vec<Box<dyn Middleware>>,
-	idx: usize,
-	future: Option<MiddlewareFuture<'a>>,
+pub enum RouterFindError {
+	NotFound,
+	MethodNotAllow(String),
+	RedirectTo(String),
+	RetryAfter(Duration),
+	Undefined,
 }
 
-impl<'a, 'c, 'r: 'a> Future for MiddlewareExecutor<'a, 'c, 'r> {
-	type Output = MiddlewareControl;
+#[async_trait]
+pub trait Router: Send + Sync {
+	/// `middleware` return two groups of middleware, the first group to execute before `find` and
+	/// the second group will execute after a successful `find` call.
+	fn middleware(&self) -> (&Vec<Box<dyn Middleware>>, &Vec<Box<dyn Middleware>>);
+	/// `find` return a `& dyn Handler` or `RouterFindError`
+	fn find<'a, 'c>(&self, req: &'a Request<'c>) -> Result<&dyn Handler, RouterFindError>;
+	/// `onerror` handle the error that returned by `find`
+	async fn onerror<'a, 'c>(&self, err: RouterFindError, req: &'a mut Request<'c>, resp: &'a mut Response<'c>);
+}
 
-	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		loop {
-			return match self.future.as_mut() {
-				Some(future) => {
-					match Pin::new(future).poll(cx) {
-						Poll::Ready(ctrl) => {
-							self.idx += 1;
-							match ctrl {
-								MiddlewareControl::Continue => {
-									if self.idx >= self.vec.len() {
-										return Poll::Ready(MiddlewareControl::Continue);
-									}
-									self.future = None;
-									Poll::Pending
-								}
-								MiddlewareControl::Break => {
-									Poll::Ready(MiddlewareControl::Break)
-								}
-							}
+#[async_trait]
+impl<T> Handler for T where T: Router {
+	async fn handle<'a, 'c, 'h: 'a>(&'h self, req: &'a mut Request<'c>, resp: &'a mut Response<'c>) {
+		let (before, after) = self.middleware();
+
+		macro_rules! run_middleware {
+		    ($name:ident) => {
+				for middleware in $name {
+					match middleware.handle(req, resp).await {
+						MiddlewareControl::Continue => {
+							continue;
 						}
-						Poll::Pending => {
-							Poll::Pending
+						MiddlewareControl::Break => {
+							break;
+						}
+						MiddlewareControl::Return => {
+							return;
 						}
 					}
 				}
-				None => {
-					let middleware = &self.vec[self.idx];
-					self.future = Some(middleware.handle(self.req, self.resp));
-					Poll::Pending
-				}
 			};
 		}
-	}
-}
 
+		run_middleware!(before);
 
-pub trait Router: Send + Sync {
-	fn middleware(&self) -> (&Vec<Box<dyn Middleware>>, &Vec<Box<dyn Middleware>>);
-	fn find<'a, 'c>(&self, req: &'a Request<'c>) -> &dyn Handler;
-}
-
-enum RouterExecutorStatus {
-	Init,
-	Before,
-	Find,
-	After,
-	Done,
-}
-
-struct RouterExecutor<'a, 'c, 'r> {
-	req: &'a mut Request<'c>,
-	resp: &'a mut Response<'c>,
-	router: &'r dyn Router,
-
-	status: RouterExecutorStatus,
-	middleware_idx: i32,
-}
-
-impl<'a, 'c, 'r> RouterExecutor<'a, 'c, 'r> {
-	fn new(req: &'a mut Request<'c>, resp: &'a mut Response<'c>, router: &'r dyn Router) -> Self {
-		return Self {
-			req,
-			resp,
-			router,
-
-			status: RouterExecutorStatus::Init,
-			middleware_idx: 0,
-		};
-	}
-}
-
-impl<'a, 'c, 'r> Future for RouterExecutor<'a, 'c, 'r> {
-	type Output = ();
-
-	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		use RouterExecutorStatus::*;
-
-		loop {
-			match self.status {
-				_ => {}
+		match self.find(req) {
+			Err(e) => {
+				self.onerror(e, req, resp).await;
+			}
+			Ok(handler) => {
+				run_middleware!(after);
+				handler.handle(req, resp).await;
 			}
 		}
-	}
-}
-
-impl<T> Handler for T where T: Router {
-	fn handle<'a, 'c, 'h: 'a>(&'h self, req: &'a mut Request<'c>, resp: &'a mut Response<'c>) -> HandlerFuture<'a> {
-		Box::pin(RouterExecutor::new(req, resp, self))
 	}
 }
