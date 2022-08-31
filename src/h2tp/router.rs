@@ -30,20 +30,17 @@ pub enum RouterFindError {
 }
 
 #[async_trait]
-pub trait Router: Send + Sync {
+pub trait Router: Handler {
 	/// `middleware` return two groups of middleware, the first group to execute before `find` and
 	/// the second group will execute after a successful `find` call.
-	fn middleware(&self) -> (&Vec<Box<dyn Middleware>>, &Vec<Box<dyn Middleware>>);
+	fn middleware<'a, 'c>(&self, req: &'a Request<'c>) -> (&Vec<Box<dyn Middleware>>, &Vec<Box<dyn Middleware>>);
 	/// `find` return a `& dyn Handler` or `RouterFindError`
 	fn find<'a, 'c>(&self, req: &'a Request<'c>) -> Result<&dyn Handler, RouterFindError>;
 	/// `onerror` handle the error that returned by `find`
 	async fn onerror<'a, 'c>(&self, err: RouterFindError, req: &'a mut Request<'c>, resp: &'a mut Response<'c>);
-}
 
-#[async_trait]
-impl<T> Handler for T where T: Router {
 	async fn handle<'a, 'c, 'h: 'a>(&'h self, req: &'a mut Request<'c>, resp: &'a mut Response<'c>) {
-		let (before, after) = self.middleware();
+		let (before, after) = self.middleware(req);
 
 		macro_rules! run_middleware {
 		    ($name:ident) => {
@@ -74,5 +71,13 @@ impl<T> Handler for T where T: Router {
 				handler.handle(req, resp).await;
 			}
 		}
+	}
+}
+
+#[async_trait]
+impl<T: Router> Handler for T {
+	#[inline]
+	async fn handle<'a, 'c, 'h: 'a>(&'h self, req: &'a mut Request<'c>, resp: &'a mut Response<'c>) -> () {
+		Router::handle(self, req, resp).await
 	}
 }

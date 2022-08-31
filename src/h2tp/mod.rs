@@ -16,6 +16,7 @@ mod types;
 mod url;
 mod utils;
 mod router;
+mod fs;
 
 pub async fn shutdown(handler: &Arc<Mutex<server::ShutdownHandler>>, timout: u64) {
 	let mut guard = handler.lock().await;
@@ -39,18 +40,18 @@ pub use headers::hns;
 #[macro_export]
 macro_rules! func {
 	($content:expr) => {
-		h2tp::FuncHandler::new(|_, _| std::boxed::Box::pin(async move { $content }))
+		crate::h2tp::FuncHandler::new(|_, _| std::boxed::Box::pin(async move { $content }))
 	};
 	(_, _, $content:expr) => {
-		h2tp::FuncHandler::new(|_, _| std::boxed::Box::pin(async move { $content }))
+		crate::h2tp::FuncHandler::new(|_, _| std::boxed::Box::pin(async move { $content }))
 	};
 	($req:ident, _, $content:expr) => {
-		h2tp::FuncHandler::new(|$req, _| std::boxed::Box::pin(async move { $content }))
+		crate::h2tp::FuncHandler::new(|$req, _| std::boxed::Box::pin(async move { $content }))
 	};
 	(_, $resp:ident, $content:expr) => {
-		h2tp::FuncHandler::new(|_, $resp| std::boxed::Box::pin(async move { $content }))
+		crate::h2tp::FuncHandler::new(|_, $resp| std::boxed::Box::pin(async move { $content }))
 	};
 	($req:ident, $resp:ident, $content:expr) => {
-		h2tp::FuncHandler::new(|$req, $resp| std::boxed::Box::pin(async move { $content }))
+		crate::h2tp::FuncHandler::new(|$req, $resp| std::boxed::Box::pin(async move { $content }))
 	};
 }

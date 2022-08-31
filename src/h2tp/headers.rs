@@ -142,11 +142,17 @@ impl Headers {
 
 	getone!(transfer_encoding -> hns::TRANSFER_ENCODING);
 
+	getone!(host -> hns::HOST);
+
 	pub fn is_chunked(&self) -> bool {
 		return match self.transfer_encoding() {
 			Some(v) => v.contains("chunked"),
 			None => false,
 		};
+	}
+
+	pub fn range(&self) -> Option<(String, usize, usize)> {
+		return None;
 	}
 }
 

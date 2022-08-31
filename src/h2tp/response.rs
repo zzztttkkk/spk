@@ -1,9 +1,10 @@
 use bytes::BytesMut;
+use tokio::fs::File;
 
 use crate::h2tp::message::Message;
 
 pub enum RespBody {
-	File(String),
+	File(File),
 }
 
 pub struct Response<'c> {
@@ -43,6 +44,8 @@ impl<'c> Response<'c> {
 		}
 		return self.msg.body.as_mut().unwrap();
 	}
+
+	pub fn ioe(&mut self, _err: std::io::Error) {}
 }
 
 impl<'c> std::io::Write for Response<'c> {

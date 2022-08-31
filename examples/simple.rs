@@ -1,9 +1,5 @@
-#![allow(dead_code)]
-
-use std::io::Write;
 use std::sync::Arc;
-
-mod h2tp;
+use spk::h2tp;
 
 #[tokio::main]
 async fn main() {
@@ -17,9 +13,9 @@ async fn main() {
 		server
 			.listen(
 				"127.0.0.1:8080",
-				Some(Arc::new(func!(req, resp, {
+				Some(Arc::new(spk::func!(req, resp, {
 					println!("{req:?}; Resp @ {resp:p}");
-					let _ = resp.write(b"Hello World!");
+					let _ = std::io::Write::write(resp, b"Hello World!");
 				}))),
 			)
 			.await;
