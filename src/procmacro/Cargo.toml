@@ -1,5 +1,5 @@
 [package]
-name = "proc_macro"
+name = "procmacro"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,3 +7,5 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
+syn = "0.11.11"
+quote = "0.3.15"
