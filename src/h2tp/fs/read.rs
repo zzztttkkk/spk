@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use crate::h2tp::handler::Handler;
 use crate::h2tp::{Request, Response};
 use crate::h2tp::response::RespBody;
+use proc_macro::Handler;
 
 pub enum ReadResult {
 	File(String),
@@ -74,19 +75,12 @@ pub trait Readable: Handler {
 	}
 }
 
-#[async_trait]
-impl<T: Readable> Handler for T {
-	#[inline]
-	async fn handle<'a, 'c, 'h: 'a>(&'h self, req: &'a mut Request<'c>, resp: &'a mut Response<'c>) -> () {
-		Readable::handle(self, req, resp).await
-	}
-}
-
 pub fn cached<'a, 'm>(metadate: &'m Metadata, req: &'a Request, resp: &'a mut Response) -> bool {
 	println!("{:?} {:?} {:p}", metadate, req, resp);
 	return false;
 }
 
+#[derive(Handler)]
 pub struct SimpleOsReader {
 	root: String,
 }
@@ -97,4 +91,3 @@ impl Readable for SimpleOsReader {
 		todo!()
 	}
 }
-

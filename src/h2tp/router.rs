@@ -74,10 +74,14 @@ pub trait Router: Handler {
 	}
 }
 
-#[async_trait]
-impl<T: Router> Handler for T {
-	#[inline]
-	async fn handle<'a, 'c, 'h: 'a>(&'h self, req: &'a mut Request<'c>, resp: &'a mut Response<'c>) -> () {
-		Router::handle(self, req, resp).await
-	}
-}
+// macro_rules! impl_handler_for_router {
+//     ($name:ident) => {
+// 		#[async_trait]
+// 		impl Handler for $name {
+// 			#[inline]
+// 			async fn handle<'a, 'c, 'h: 'a>(&'h self, req: &'a mut Request<'c>, resp: &'a mut Response<'c>) -> () {
+// 				Router::handle(self, req, resp).await
+// 			}
+// 		}
+// 	};
+// }
