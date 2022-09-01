@@ -2,10 +2,14 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 
-fn get_type_name(ts: TokenStream) -> String {
+fn get_type_name_and_attrs(ts: TokenStream) -> String {
 	let mut status = 0;
 	let mut buf = String::new();
 	for tree in ts {
+		if tree.to_string().starts_with("[") && tree.to_string().ends_with("]") {
+			println!("{:?}", tree);
+			continue;
+		}
 		match status {
 			0 => {
 				if tree.to_string() == "struct" {
@@ -37,9 +41,9 @@ fn get_type_name(ts: TokenStream) -> String {
 	return buf;
 }
 
-#[proc_macro_derive(Handler)]
+#[proc_macro_derive(Handler, attributes(From))]
 pub fn impl_handler(ts: TokenStream) -> TokenStream {
-	let name = get_type_name(ts);
+	let name = get_type_name_and_attrs(ts);
 	if name.contains("<") || name.contains("'") {
 		panic!("item can not be generice typed and must has empty speacial lifetime params");
 	}

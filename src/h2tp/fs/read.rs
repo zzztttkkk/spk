@@ -81,6 +81,7 @@ pub fn cached<'a, 'm>(metadate: &'m Metadata, req: &'a Request, resp: &'a mut Re
 }
 
 #[derive(Handler)]
+#[From = "crate::h2tp::fs::read::Readable"]
 pub struct SimpleOsReader {
 	root: String,
 }
