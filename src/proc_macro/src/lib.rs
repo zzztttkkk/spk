@@ -40,8 +40,8 @@ fn get_type_name(ts: TokenStream) -> String {
 #[proc_macro_derive(Handler)]
 pub fn impl_handler(ts: TokenStream) -> TokenStream {
 	let name = get_type_name(ts);
-	if name.contains("<") {
-		panic!("item can not be generice typed and must has empty lifetime params");
+	if name.contains("<") || name.contains("'") {
+		panic!("item can not be generice typed and must has empty speacial lifetime params");
 	}
 	return format!("#[async_trait]\
 	impl crate::h2tp::handler::Handler for {} {{\
